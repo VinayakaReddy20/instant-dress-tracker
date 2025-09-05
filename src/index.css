@@ -1,42 +1,61 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap');
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Premium Dress Tracker Design System */
 
 @layer base {
   :root {
+    /* Premium color palette */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 224 71% 4%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 224 71% 4%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 224 71% 4%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 225 100% 12%;
+    --primary-foreground: 0 0% 98%;
+    --primary-light: 225 100% 20%;
+    --primary-dark: 225 100% 8%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 224 71% 4%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 225 100% 96%;
+    --accent-foreground: 225 100% 12%;
+    --accent-gold: 43 74% 66%;
+    --accent-copper: 25 95% 53%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 225 100% 12%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
+
+    /* Premium gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary-light)) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(225 100% 20%) 50%, hsl(255 100% 25%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%) 0%, hsl(220 14% 98%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(var(--accent-gold)) 0%, hsl(var(--accent-copper)) 100%);
+
+    /* Premium shadows */
+    --shadow-card: 0 4px 6px -1px hsl(225 100% 12% / 0.1), 0 2px 4px -1px hsl(225 100% 12% / 0.06);
+    --shadow-card-hover: 0 10px 15px -3px hsl(225 100% 12% / 0.15), 0 4px 6px -2px hsl(225 100% 12% / 0.1);
+    --shadow-hero: 0 25px 50px -12px hsl(225 100% 12% / 0.25);
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
     --sidebar-background: 0 0% 98%;
 
@@ -100,6 +119,90 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-inter;
+  }
+}
+
+@layer components {
+  /* Premium button variants */
+  .btn-hero {
+    @apply bg-primary text-primary-foreground hover:bg-primary-light;
+    @apply transition-all duration-300 transform hover:scale-105;
+    @apply shadow-lg hover:shadow-xl;
+  }
+
+  .btn-accent {
+    background: var(--gradient-accent);
+    @apply text-white hover:shadow-lg;
+    @apply transition-all duration-300 transform hover:scale-105;
+  }
+
+  .btn-outline-premium {
+    @apply border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground;
+    @apply transition-all duration-300;
+  }
+
+  /* Premium card styles */
+  .card-premium {
+    background: var(--gradient-card);
+    box-shadow: var(--shadow-card);
+    @apply transition-all duration-300 hover:shadow-lg;
+    @apply transform hover:-translate-y-1;
+  }
+
+  .card-dress {
+    @apply bg-card rounded-xl overflow-hidden;
+    box-shadow: var(--shadow-card);
+    @apply transition-all duration-300;
+    @apply transform hover:-translate-y-2;
+  }
+
+  .card-dress:hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  /* Premium input styles */
+  .input-premium {
+    @apply bg-white border-2 border-border focus:border-primary;
+    @apply transition-all duration-300 rounded-xl;
+    @apply shadow-sm focus:shadow-md;
+  }
+
+  /* Hero section */
+  .hero-gradient {
+    background: var(--gradient-hero);
+  }
+
+  /* Animations */
+  .animate-fade-in {
+    @apply opacity-0 animate-[fadeIn_0.6s_ease-out_forwards];
+  }
+
+  .animate-slide-up {
+    @apply translate-y-4 opacity-0 animate-[slideUp_0.6s_ease-out_forwards];
+  }
+
+  .animate-scale-in {
+    @apply scale-95 opacity-0 animate-[scaleIn_0.4s_ease-out_forwards];
+  }
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  to {
+    transform: scale(1);
+    opacity: 1;
   }
 }
