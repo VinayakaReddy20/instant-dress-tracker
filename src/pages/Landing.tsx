@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Navbar from "@/components/Navbar";
 import heroBoutique from "@/assets/hero-boutique.jpg";
+import Footer from "@/components/Footer";
 
 const Landing = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -115,6 +116,8 @@ const Landing = () => {
           </div>
         </div>
       </section>
+      
+      <Footer />
     </div>
   );
 };
