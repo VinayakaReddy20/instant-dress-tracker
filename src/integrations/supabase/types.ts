@@ -14,7 +14,113 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      dresses: {
+        Row: {
+          brand: string | null
+          category: string
+          color: string
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          material: string | null
+          name: string
+          price: number
+          shop_id: string
+          size: string
+          stock: number | null
+          updated_at: string
+        }
+        Insert: {
+          brand?: string | null
+          category: string
+          color: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          material?: string | null
+          name: string
+          price: number
+          shop_id: string
+          size: string
+          stock?: number | null
+          updated_at?: string
+        }
+        Update: {
+          brand?: string | null
+          category?: string
+          color?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          material?: string | null
+          name?: string
+          price?: number
+          shop_id?: string
+          size?: string
+          stock?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dresses_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shops: {
+        Row: {
+          address: string
+          created_at: string
+          description: string | null
+          hours: string | null
+          id: string
+          image_url: string | null
+          location: string
+          name: string
+          phone: string | null
+          rating: number | null
+          review_count: number | null
+          specialties: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          address: string
+          created_at?: string
+          description?: string | null
+          hours?: string | null
+          id?: string
+          image_url?: string | null
+          location: string
+          name: string
+          phone?: string | null
+          rating?: number | null
+          review_count?: number | null
+          specialties?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          created_at?: string
+          description?: string | null
+          hours?: string | null
+          id?: string
+          image_url?: string | null
+          location?: string
+          name?: string
+          phone?: string | null
+          rating?: number | null
+          review_count?: number | null
+          specialties?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

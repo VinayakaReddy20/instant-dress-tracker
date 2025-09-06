@@ -1,76 +1,73 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Filter, MapPin, Package, Eye, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/Navbar";
+import { supabase } from "@/integrations/supabase/client";
 
-// Mock data - replace with real data from Supabase
-const mockDresses = [
-  {
-    id: 1,
-    name: "Elegant Evening Gown",
-    shop: "Bella's Boutique",
-    location: "Downtown Plaza",
-    price: 299,
-    stock: 3,
-    image: "/api/placeholder/300/400",
-    size: "M",
-    color: "Navy Blue",
-    category: "Evening"
-  },
-  {
-    id: 2,
-    name: "Floral Summer Dress",
-    shop: "Garden Style",
-    location: "Main Street",
-    price: 89,
-    stock: 7,
-    image: "/api/placeholder/300/400",
-    size: "S",
-    color: "Pink",
-    category: "Casual"
-  },
-  {
-    id: 3,
-    name: "Classic Black Cocktail",
-    shop: "Elite Fashion",
-    location: "Fashion District",
-    price: 199,
-    stock: 1,
-    image: "/api/placeholder/300/400",
-    size: "L",
-    color: "Black",
-    category: "Cocktail"
-  },
-  {
-    id: 4,
-    name: "Bohemian Maxi Dress",
-    shop: "Free Spirit",
-    location: "Arts Quarter",
-    price: 149,
-    stock: 5,
-    image: "/api/placeholder/300/400",
-    size: "M",
-    color: "Teal",
-    category: "Casual"
-  }
-];
+interface Dress {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  size: string;
+  color: string;
+  category: string;
+  image_url?: string;
+  description?: string;
+  material?: string;
+  brand?: string;
+  shop?: {
+    name: string;
+    location: string;
+  };
+}
 
 const Dresses = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedSize, setSelectedSize] = useState("all");
   const [selectedShop, setSelectedShop] = useState("all");
+  const [dresses, setDresses] = useState<Dress[]>([]);
+  const [shops, setShops] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredDresses = mockDresses.filter(dress => {
+  useEffect(() => {
+    fetchDresses();
+  }, []);
+
+  const fetchDresses = async () => {
+    try {
+      const { data: dressesData, error: dressesError } = await supabase
+        .from('dresses')
+        .select(`
+          *,
+          shop:shops(name, location)
+        `);
+
+      if (dressesError) throw dressesError;
+
+      setDresses(dressesData || []);
+      
+      // Extract unique shop names for filter
+      const uniqueShops = [...new Set(dressesData?.map(dress => dress.shop?.name).filter(Boolean) || [])];
+      setShops(uniqueShops);
+    } catch (error) {
+      console.error('Error fetching dresses:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredDresses = dresses.filter(dress => {
     const matchesSearch = dress.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         dress.shop.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         dress.shop?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          dress.color.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "all" || dress.category.toLowerCase() === selectedCategory;
     const matchesSize = selectedSize === "all" || dress.size === selectedSize;
-    const matchesShop = selectedShop === "all" || dress.shop === selectedShop;
+    const matchesShop = selectedShop === "all" || dress.shop?.name === selectedShop;
     
     return matchesSearch && matchesCategory && matchesSize && matchesShop;
   });
@@ -109,9 +106,15 @@ const Dresses = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="evening">Evening</SelectItem>
-                  <SelectItem value="cocktail">Cocktail</SelectItem>
+                  <SelectItem value="bridal">Bridal</SelectItem>
+                  <SelectItem value="traditional">Traditional</SelectItem>
+                  <SelectItem value="designer">Designer</SelectItem>
+                  <SelectItem value="party wear">Party Wear</SelectItem>
                   <SelectItem value="casual">Casual</SelectItem>
+                  <SelectItem value="indo-western">Indo-Western</SelectItem>
+                  <SelectItem value="western">Western</SelectItem>
+                  <SelectItem value="wedding">Wedding</SelectItem>
+                  <SelectItem value="luxury">Luxury</SelectItem>
                 </SelectContent>
               </Select>
               
@@ -135,10 +138,9 @@ const Dresses = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Shops</SelectItem>
-                  <SelectItem value="Bella's Boutique">Bella's Boutique</SelectItem>
-                  <SelectItem value="Garden Style">Garden Style</SelectItem>
-                  <SelectItem value="Elite Fashion">Elite Fashion</SelectItem>
-                  <SelectItem value="Free Spirit">Free Spirit</SelectItem>
+                  {shops.map(shop => (
+                    <SelectItem key={shop} value={shop}>{shop}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               
@@ -172,8 +174,14 @@ const Dresses = () => {
           </div>
           
           {/* Dress Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredDresses.map((dress, index) => (
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <p className="text-muted-foreground mt-4">Loading dresses...</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredDresses.map((dress, index) => (
               <div
                 key={dress.id}
                 className="card-dress animate-scale-in"
@@ -181,7 +189,7 @@ const Dresses = () => {
               >
                 <div className="relative">
                   <img
-                    src={dress.image}
+                    src={dress.image_url || "/api/placeholder/300/400"}
                     alt={dress.name}
                     className="w-full h-64 object-cover"
                   />
@@ -208,7 +216,7 @@ const Dresses = () => {
                   <div className="space-y-2">
                     <div className="flex items-center text-sm text-muted-foreground">
                       <MapPin className="w-4 h-4 mr-1" />
-                      {dress.shop} • {dress.location}
+                      {dress.shop?.name} • {dress.shop?.location}
                     </div>
                     
                     <div className="flex items-center justify-between">
@@ -217,7 +225,7 @@ const Dresses = () => {
                         <Badge variant="outline">{dress.color}</Badge>
                       </div>
                       <span className="text-lg font-semibold text-primary">
-                        ${dress.price}
+                        ₹{dress.price.toLocaleString('en-IN')}
                       </span>
                     </div>
                   </div>
@@ -228,8 +236,9 @@ const Dresses = () => {
                   </Button>
                 </div>
               </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
           
           {filteredDresses.length === 0 && (
             <div className="text-center py-12">
