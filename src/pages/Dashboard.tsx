@@ -1,342 +1,609 @@
-import { useState } from "react";
-import { Plus, Edit, Trash2, Package, AlertTriangle, TrendingUp } from "lucide-react";
+// src/pages/Dashboard.tsx
+import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  Loader2,
+  Store,
+  Shirt,
+  CheckCircle2,
+  XCircle,
+  PlusCircle,
+  LogOut,
+  Trash2,
+  BarChart3,
+  Settings,
+  Package,
+  Star,
+} from "lucide-react";
+import Navbar from "@/components/Navbar";
+import { supabase } from "@/integrations/supabaseClient";
+import DressList from "@/components/DressList";
+import { default as DressForm } from "@/components/DressForm";
+import ShopEditForm from "@/components/ShopEditForm";
 
-// Mock data - replace with real data from Supabase
-const mockDresses = [
-  {
-    id: 1,
-    name: "Elegant Evening Gown",
-    size: "M",
-    color: "Navy Blue",
-    price: 299,
-    stock: 3,
-    category: "Evening",
-    image: "/api/placeholder/200/300"
-  },
-  {
-    id: 2,
-    name: "Floral Summer Dress",
-    size: "S",
-    color: "Pink",
-    price: 89,
-    stock: 0,
-    category: "Casual",
-    image: "/api/placeholder/200/300"
-  },
-  {
-    id: 3,
-    name: "Classic Black Cocktail",
-    size: "L",
-    color: "Black",
-    price: 199,
-    stock: 1,
-    category: "Cocktail",
-    image: "/api/placeholder/200/300"
-  }
-];
+// ----- TYPES -----
+interface Shop {
+  id: string;
+  name: string;
+  location: string;
+  address: string;
+  phone?: string;
+  rating?: number;
+  review_count?: number;
+  hours?: string;
+  specialties?: string[];
+  description?: string;
+  image_url?: string;
+  full_name?: string;
+  business_name?: string;
+}
 
-const Dashboard = () => {
-  const [dresses, setDresses] = useState(mockDresses);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingDress, setEditingDress] = useState<any>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    size: "",
-    color: "",
-    price: "",
-    stock: "",
-    category: "",
-    description: ""
-  });
+export interface DressFormData {
+  id?: string;
+  shop_id: string; // REQUIRED
+  name: string;
+  price: number;
+  size: string;
+  color: string;
+  category: string;
+  description?: string;
+  material?: string;
+  brand?: string;
+  stock?: number;
+  image_url?: string;
+}
 
-  const lowStockDresses = dresses.filter(dress => dress.stock <= 1);
-  const totalDresses = dresses.length;
-  const totalValue = dresses.reduce((sum, dress) => sum + (dress.price * dress.stock), 0);
+// ----- DASHBOARD COMPONENT -----
+export default function Dashboard() {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [shop, setShop] = useState<Shop | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // TODO: Implement with Supabase
-    console.log("Form submitted:", formData);
-    setIsAddModalOpen(false);
+  const [dresses, setDresses] = useState<DressFormData[]>([]);
+  const [loadingDresses, setLoadingDresses] = useState(false);
+  const [editingDress, setEditingDress] = useState<DressFormData | null>(null);
+  const [showDressForm, setShowDressForm] = useState(false);
+
+  const [editingShop, setEditingShop] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
+
+  // ----- GET LOGGED-IN USER -----
+  useEffect(() => {
+    const getUser = async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error("Auth error:", error);
+        setError("Please log in to view your dashboard.");
+        setLoading(false);
+        return;
+      }
+      setOwnerId(data.user?.id ?? null);
+    };
+    getUser();
+  }, []);
+
+  // ----- FETCH DASHBOARD -----
+  const fetchDashboard = useCallback(async () => {
+    if (!ownerId) return;
+
+    try {
+      const { data: shopOwnerData, error: shopOwnerError } = await supabase
+        .from("shop_owners")
+        .select("id")
+        .eq("user_id", ownerId)
+        .single();
+      if (shopOwnerError) throw shopOwnerError;
+
+      if (!shopOwnerData || !shopOwnerData.id) {
+        setError("Shop owner profile not found.");
+        setLoading(false);
+        return;
+      }
+
+      const { data: shopData, error: shopError } = await supabase
+        .from("shops")
+        .select("*")
+        .eq("owner_id", shopOwnerData.id)
+        .single();
+      if (shopError) throw shopError;
+
+      if (!shopData || !shopData.id) {
+        setError("Shop not found.");
+        setLoading(false);
+        return;
+      }
+
+      setShop(shopData as Shop);
+
+      setLoadingDresses(true);
+      const { data: dressesData, error: dressesError } = await supabase
+        .from("dresses")
+        .select("*")
+        .eq("shop_id", shopData.id)
+        .order("created_at", { ascending: false });
+      if (dressesError) throw dressesError;
+
+      setDresses((dressesData || []) as DressFormData[]);
+      setLoadingDresses(false);
+      setLoading(false);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to load dashboard data.");
+      setLoading(false);
+    }
+  }, [ownerId]);
+
+  useEffect(() => {
+    if (ownerId) fetchDashboard();
+  }, [ownerId, fetchDashboard]);
+
+  // ----- DRESS HANDLERS -----
+  const handleAddDress = () => {
     setEditingDress(null);
-    setFormData({
-      name: "",
-      size: "",
-      color: "",
-      price: "",
-      stock: "",
-      category: "",
-      description: ""
-    });
+    setShowDressForm(true);
+  };
+  const handleEditDress = (dress: DressFormData) => {
+    if (!shop) return;
+    setEditingDress({ ...dress, shop_id: shop.id });
+    setShowDressForm(true);
+  };
+  const handleDeleteDress = async (dressId: string) => {
+    if (!shop) return;
+    if (!confirm("Are you sure you want to delete this dress?")) return;
+    try {
+      const { error } = await supabase
+        .from("dresses")
+        .delete()
+        .eq("id", dressId);
+      if (error) throw error;
+      setDresses((prev) => prev.filter((d) => d.id !== dressId));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete dress.");
+    }
+  };
+  const handleDressFormSave = () => {
+    setShowDressForm(false);
+    fetchDashboard();
+  };
+  const handleDressFormCancel = () => setShowDressForm(false);
+
+  // ----- SHOP HANDLERS -----
+  const handleEditShop = () => setEditingShop(true);
+  const handleShopFormSave = () => {
+    setEditingShop(false);
+    fetchDashboard();
+  };
+  const handleShopFormCancel = () => setEditingShop(false);
+
+  // ----- SHOP CREATION -----
+  const handleCreateShop = async () => {
+    if (!ownerId) {
+      alert("You must be logged in to create a shop.");
+      return;
+    }
+    try {
+      const { data: shopOwnerData, error: shopOwnerError } = await supabase
+        .from("shop_owners")
+        .select("id")
+        .eq("user_id", ownerId)
+        .single();
+      if (shopOwnerError) {
+        console.error("Error fetching shop owner:", shopOwnerError);
+        alert("Could not find shop owner record for this account.");
+        return;
+      }
+
+      if (!shopOwnerData) {
+        alert("Shop owner profile not found.");
+        return;
+      }
+
+      const shopInsertData = {
+        owner_id: shopOwnerData.id,
+        name: "My New Shop",
+        business_name: "",
+        location: "Enter location",
+        address: "Enter address",
+        phone: "",
+      };
+
+      const { data: newShop, error: shopError } = await supabase
+        .from("shops")
+        .insert([shopInsertData])
+        .select()
+        .single();
+      if (shopError) throw shopError;
+
+      if (!newShop) {
+        alert("Failed to create shop.");
+        return;
+      }
+
+      setShop(newShop as Shop);
+      setError(null);
+    } catch (err) {
+      console.error("Error creating shop:", err);
+      alert("Failed to create shop. Please try again.");
+    }
   };
 
-  const handleEdit = (dress: any) => {
-    setEditingDress(dress);
-    setFormData({
-      name: dress.name,
-      size: dress.size,
-      color: dress.color,
-      price: dress.price.toString(),
-      stock: dress.stock.toString(),
-      category: dress.category,
-      description: ""
-    });
+  // ----- LOGOUT -----
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      navigate("/");
+    } catch (err) {
+      console.error("Logout error:", err);
+      alert("Failed to logout.");
+    }
   };
 
-  const handleDelete = (id: number) => {
-    // TODO: Implement with Supabase
-    setDresses(dresses.filter(dress => dress.id !== id));
+  // ----- DELETE SHOP -----
+  const handleDeleteShop = async () => {
+    if (!shop) return;
+    if (!confirm("Are you sure you want to delete this shop? This will delete all dresses as well.")) return;
+    try {
+      // Delete dresses first
+      const { error: dressesError } = await supabase
+        .from("dresses")
+        .delete()
+        .eq("shop_id", shop.id);
+      if (dressesError) throw dressesError;
+
+      // Delete shop
+      const { error: shopError } = await supabase
+        .from("shops")
+        .delete()
+        .eq("id", shop.id);
+      if (shopError) throw shopError;
+
+      setShop(null);
+      setError("Shop deleted successfully.");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete shop.");
+    }
   };
 
-  return (
-    <div className="min-h-screen bg-muted/30">
-      {/* Header */}
-      <div className="bg-white border-b border-border">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-playfair font-bold text-primary">Shop Dashboard</h1>
-              <p className="text-muted-foreground">Manage your dress inventory</p>
-            </div>
-            <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-              <DialogTrigger asChild>
-                <Button className="btn-hero">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add New Dress
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>
-                    {editingDress ? "Edit Dress" : "Add New Dress"}
-                  </DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Dress Name</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="input-premium"
-                      required
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="size">Size</Label>
-                      <Select value={formData.size} onValueChange={(value) => setFormData({ ...formData, size: value })}>
-                        <SelectTrigger className="input-premium">
-                          <SelectValue placeholder="Select size" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="XS">XS</SelectItem>
-                          <SelectItem value="S">S</SelectItem>
-                          <SelectItem value="M">M</SelectItem>
-                          <SelectItem value="L">L</SelectItem>
-                          <SelectItem value="XL">XL</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="color">Color</Label>
-                      <Input
-                        id="color"
-                        value={formData.color}
-                        onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                        className="input-premium"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="price">Price ($)</Label>
-                      <Input
-                        id="price"
-                        type="number"
-                        value={formData.price}
-                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                        className="input-premium"
-                        required
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="stock">Stock Count</Label>
-                      <Input
-                        id="stock"
-                        type="number"
-                        value={formData.stock}
-                        onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                        className="input-premium"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
-                    <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                      <SelectTrigger className="input-premium">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Evening">Evening</SelectItem>
-                        <SelectItem value="Cocktail">Cocktail</SelectItem>
-                        <SelectItem value="Casual">Casual</SelectItem>
-                        <SelectItem value="Formal">Formal</SelectItem>
-                        <SelectItem value="Bridal">Bridal</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      className="input-premium"
-                      rows={3}
-                    />
-                  </div>
-                  
-                  <Button type="submit" className="w-full btn-hero">
-                    {editingDress ? "Update Dress" : "Add Dress"}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
+  // ----- RENDER -----
+  if (loading) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-gray-50">
+        <Loader2 className="animate-spin w-10 h-10 text-blue-600" />
+        <p className="mt-3 text-gray-600 text-sm">
+          Loading your dashboard...
+        </p>
       </div>
+    );
+  }
 
-      <div className="container mx-auto px-4 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="card-premium">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Dresses</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalDresses}</div>
-              <p className="text-xs text-muted-foreground">
-                Active inventory items
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card className="card-premium">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Low Stock Alert</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-500">{lowStockDresses.length}</div>
-              <p className="text-xs text-muted-foreground">
-                Items need restocking
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card className="card-premium">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-              <TrendingUp className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${totalValue.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">
-                Total inventory value
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Dress Inventory */}
-        <Card className="card-premium">
+  if (error || !shop) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-gray-50">
+        <Card className="w-[380px] shadow-lg border border-gray-200">
           <CardHeader>
-            <CardTitle className="text-xl font-playfair">Your Dress Collection</CardTitle>
+            <CardTitle className="text-center text-lg font-semibold">
+              {error || "No shop found"}
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {dresses.map((dress) => (
-                <div key={dress.id} className="card-dress">
-                  <div className="relative">
-                    <img
-                      src={dress.image}
-                      alt={dress.name}
-                      className="w-full h-48 object-cover"
-                    />
-                    <Badge
-                      variant={dress.stock > 1 ? "default" : dress.stock > 0 ? "secondary" : "destructive"}
-                      className="absolute top-2 left-2"
-                    >
-                      {dress.stock > 0 ? `${dress.stock} in stock` : "Out of stock"}
-                    </Badge>
-                  </div>
-                  
-                  <div className="p-4 space-y-3">
-                    <h3 className="font-semibold text-lg line-clamp-2">{dress.name}</h3>
-                    
-                    <div className="flex justify-between items-center">
-                      <div className="flex gap-2">
-                        <Badge variant="outline">{dress.size}</Badge>
-                        <Badge variant="outline">{dress.color}</Badge>
-                      </div>
-                      <span className="text-lg font-semibold text-primary">
-                        ${dress.price}
-                      </span>
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleEdit(dress)}
-                        className="flex-1"
-                      >
-                        <Edit className="w-4 h-4 mr-1" />
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleDelete(dress.id)}
-                        className="flex-1"
-                      >
-                        <Trash2 className="w-4 h-4 mr-1" />
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <CardContent className="text-center">
+            <p className="text-gray-600 mb-4">
+              You don't have a shop linked to this account.
+            </p>
+            <Button
+              className="w-full bg-blue-600 hover:bg-blue-700"
+              onClick={handleCreateShop}
+            >
+              + Create My Shop
+            </Button>
           </CardContent>
         </Card>
       </div>
+    );
+  }
+
+  // ---- Stats ----
+  const totalDresses = dresses.length;
+  const inStock = dresses.filter((d) => (d.stock ?? 0) > 0).length;
+  const outOfStock = totalDresses - inStock;
+  const totalValue = dresses.reduce((sum, d) => sum + (d.price * (d.stock || 0)), 0);
+  const recentDresses = dresses.slice(0, 3); // Last 3 added
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Store className="w-8 h-8 text-blue-600" />
+              {shop.name} Dashboard
+            </h1>
+            <p className="text-gray-600 mt-1">Manage your e-commerce store</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={handleLogout}
+            className="flex items-center gap-2"
+          >
+            <LogOut className="w-4 h-4" />
+            Logout
+          </Button>
+        </div>
+
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="products" className="flex items-center gap-2">
+              <Package className="w-4 h-4" />
+              Products
+            </TabsTrigger>
+            <TabsTrigger value="shop" className="flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              Shop Settings
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="shadow-sm border">
+                <CardContent className="flex items-center p-6">
+                  <Package className="w-10 h-10 text-blue-600 mr-4" />
+                  <div>
+                    <p className="text-sm text-gray-500">Total Products</p>
+                    <p className="text-2xl font-bold">{totalDresses}</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="shadow-sm border">
+                <CardContent className="flex items-center p-6">
+                  <CheckCircle2 className="w-10 h-10 text-green-600 mr-4" />
+                  <div>
+                    <p className="text-sm text-gray-500">In Stock</p>
+                    <p className="text-2xl font-bold">{inStock}</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="shadow-sm border">
+                <CardContent className="flex items-center p-6">
+                  <XCircle className="w-10 h-10 text-red-600 mr-4" />
+                  <div>
+                    <p className="text-sm text-gray-500">Out of Stock</p>
+                    <p className="text-2xl font-bold">{outOfStock}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Quick Actions & Recent Activity */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Quick Actions */}
+              <Card className="shadow-sm border">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Settings className="w-5 h-5" />
+                    Quick Actions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button
+                    onClick={() => {
+                      handleAddDress();
+                      setActiveTab("products");
+                    }}
+                    className="w-full justify-start"
+                    variant="outline"
+                  >
+                    <PlusCircle className="w-4 h-4 mr-2" />
+                    Add New Product
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      handleEditShop();
+                      setActiveTab("shop");
+                    }}
+                    className="w-full justify-start"
+                    variant="outline"
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    Edit Shop Details
+                  </Button>
+                  <Button
+                    onClick={() => navigate("/dresses")}
+                    className="w-full justify-start"
+                    variant="outline"
+                  >
+                    <Store className="w-4 h-4 mr-2" />
+                    View Store Front
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Recent Products */}
+              <Card className="shadow-sm border">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="w-5 h-5" />
+                    Recent Products
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {recentDresses.length > 0 ? (
+                    <div className="space-y-3">
+                      {recentDresses.map((dress) => (
+                        <div key={dress.id} className="flex items-center gap-3 p-2 rounded-lg border">
+                          <img
+                            src={dress.image_url || "https://via.placeholder.com/50x50?text=Dress"}
+                            alt={dress.name}
+                            className="w-10 h-10 object-cover rounded"
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{dress.name}</p>
+                            <p className="text-xs text-gray-500">₹{dress.price.toLocaleString("en-IN")}</p>
+                          </div>
+                          <Badge variant={dress.stock && dress.stock > 0 ? "default" : "secondary"}>
+                            {dress.stock && dress.stock > 0 ? `${dress.stock} in stock` : "Out of stock"}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-sm">No products added yet.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Shop Info Summary */}
+            <Card className="shadow-sm border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Store className="w-5 h-5" />
+                  Shop Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <p className="font-medium">Location</p>
+                    <p className="text-gray-600">{shop.location}</p>
+                  </div>
+                  <div>
+                    <p className="font-medium">Rating</p>
+                    <div className="flex items-center gap-1">
+                      <Star className="w-4 h-4 text-yellow-500" />
+                      <span>{shop.rating?.toFixed(1) || "N/A"}</span>
+                      <span className="text-gray-500">({shop.review_count || 0} reviews)</span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-medium">Specialties</p>
+                    <p className="text-gray-600">{shop.specialties?.join(", ") || "N/A"}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Products Tab */}
+          <TabsContent value="products" className="space-y-6">
+            <Card className="shadow-md border">
+              <CardHeader className="flex justify-between items-center">
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="w-5 h-5" />
+                  Product Management
+                </CardTitle>
+                {!showDressForm && (
+                  <Button
+                    onClick={handleAddDress}
+                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+                  >
+                    <PlusCircle className="w-5 h-5" /> Add Product
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                {showDressForm ? (
+                  <DressForm
+                    initialData={editingDress ?? undefined}
+                    shopId={shop.id}
+                    onSave={handleDressFormSave}
+                    onCancel={handleDressFormCancel}
+                  />
+                ) : (
+                  <DressList
+                    dresses={dresses}
+                    onEdit={handleEditDress}
+                    onDelete={handleDeleteDress}
+                    loading={loadingDresses}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Shop Settings Tab */}
+          <TabsContent value="shop" className="space-y-6">
+            <Card className="shadow-md border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="w-5 h-5" />
+                  Shop Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {editingShop ? (
+                  <ShopEditForm
+                    initialData={shop}
+                    onSave={handleShopFormSave}
+                    onCancel={handleShopFormCancel}
+                  />
+                ) : (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                      <div className="space-y-2">
+                        <p><strong>Shop Name:</strong> {shop.name}</p>
+                        <p><strong>Business Name:</strong> {shop.business_name || "N/A"}</p>
+                        <p><strong>Owner:</strong> {shop.full_name || "N/A"}</p>
+                        <p><strong>Phone:</strong> {shop.phone || "N/A"}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <p><strong>Location:</strong> {shop.location}</p>
+                        <p><strong>Address:</strong> {shop.address}</p>
+                        <p><strong>Hours:</strong> {shop.hours || "N/A"}</p>
+                        <p><strong>Specialties:</strong> {shop.specialties?.join(", ") || "N/A"}</p>
+                      </div>
+                    </div>
+                    {shop.description && (
+                      <div>
+                        <p className="font-medium mb-2">Description:</p>
+                        <p className="text-gray-600">{shop.description}</p>
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={handleEditShop}
+                        className="flex items-center gap-2"
+                      >
+                        <Settings className="w-4 h-4" />
+                        Edit Shop Details
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={handleDeleteShop}
+                        className="flex items-center gap-2"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete Shop
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          {/* Removed Analytics Tab as per user request */}
+          {/* Orders Tab */}
+          {/* Removed Orders Tab as per user request */}
+        </Tabs>
+      </div>
     </div>
   );
-};
-
-export default Dashboard;
+}

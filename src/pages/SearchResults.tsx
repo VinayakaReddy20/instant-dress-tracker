@@ -1,12 +1,16 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Search, Filter, MapPin, Package, Eye, Heart, Star, Phone, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import Navbar from "@/components/Navbar";
+import { searchSchema, type SearchFormData } from "@/lib/validations";
 
 // Mock data - same as in Dresses and Shops pages
 const mockDresses = [
@@ -117,15 +121,23 @@ const mockShops = [
 
 const SearchResults = () => {
   const [searchParams] = useSearchParams();
-  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
   const [activeTab, setActiveTab] = useState("all");
+
+  const form = useForm<SearchFormData>({
+    resolver: zodResolver(searchSchema),
+    defaultValues: {
+      query: searchParams.get("q") || "",
+    },
+  });
+
+  const searchQuery = form.watch("query");
 
   useEffect(() => {
     const query = searchParams.get("q");
     if (query) {
-      setSearchQuery(query);
+      form.setValue("query", query);
     }
-  }, [searchParams]);
+  }, [searchParams, form]);
 
   // Filter dresses based on search query
   const filteredDresses = mockDresses.filter(dress => {
@@ -163,16 +175,28 @@ const SearchResults = () => {
             
             {/* Search Bar */}
             <div className="mb-6">
-              <div className="relative">
-                <Search className="absolute left-4 top-4 h-5 w-5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Search dresses, shops, styles..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="input-premium pl-12 h-12 text-lg"
+              <Form {...form}>
+                <FormField
+                  control={form.control}
+                  name="query"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="relative">
+                        <Search className="absolute left-4 top-4 h-5 w-5 text-muted-foreground" />
+                        <FormControl>
+                          <Input
+                            type="text"
+                            placeholder="Search dresses, shops, styles..."
+                            className="input-premium pl-12 h-12 text-lg"
+                            {...field}
+                          />
+                        </FormControl>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
+              </Form>
             </div>
 
             {searchQuery && (
