@@ -1,22 +1,23 @@
 import { Facebook, Instagram, Twitter, Mail, Phone, MapPin } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Footer = () => {
   const customerLinks = [
-    { name: "Browse Dresses", href: "/dresses" },
-    { name: "Find Shops", href: "/shops" },
-    { name: "Style Advice", href: "#" },
-    { name: "FAQs", href: "#" }
+    { name: "Browse Dresses", to: "/dresses" },
+    { name: "Find Shops", to: "/shops" },
+    { name: "Style Advice", to: "#" },
+    { name: "FAQs", to: "#" }
   ];
 
   const companyLinks = [
-    { name: "About Us", href: "#about" },
-    { name: "Our Partners", href: "#" },
-    { name: "Careers", href: "#" },
+    { name: "About Us", to: "#about" },
+    { name: "Our Partners", to: "#" },
+    { name: "Careers", to: "#" },
   ];
 
   const supportLinks = [
-    { name: "Contact Us", href: "#" },
-    { name: "Privacy Policy", href: "#" }
+    { name: "Contact Us", to: "#" },
+    { name: "Privacy Policy", to: "#" }
   ];
 
   const socialLinks = [
@@ -89,13 +90,23 @@ const Footer = () => {
             <ul className="space-y-3">
               {customerLinks.map((link, index) => (
                 <li key={index}>
-                  <a
-                    href={link.href}
-                    className="text-gray-300 hover:text-pink-400 transition-colors duration-300 
-                               text-sm hover:underline block py-1"
-                  >
-                    {link.name}
-                  </a>
+                  {link.to.startsWith("#") ? (
+                    <a
+                      href={link.to}
+                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300 
+                                 text-sm hover:underline block py-1"
+                    >
+                      {link.name}
+                    </a>
+                  ) : (
+                    <Link
+                      to={link.to}
+                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300 
+                                 text-sm hover:underline block py-1"
+                    >
+                      {link.name}
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>
@@ -107,13 +118,23 @@ const Footer = () => {
             <ul className="space-y-3">
               {companyLinks.map((link, index) => (
                 <li key={index}>
-                  <a
-                    href={link.href}
-                    className="text-gray-300 hover:text-pink-400 transition-colors duration-300 
-                               text-sm hover:underline block py-1"
-                  >
-                    {link.name}
-                  </a>
+                  {link.to.startsWith("#") ? (
+                    <a
+                      href={link.to}
+                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300 
+                                 text-sm hover:underline block py-1"
+                    >
+                      {link.name}
+                    </a>
+                  ) : (
+                    <Link
+                      to={link.to}
+                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300 
+                                 text-sm hover:underline block py-1"
+                    >
+                      {link.name}
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>
@@ -125,13 +146,23 @@ const Footer = () => {
             <ul className="space-y-3">
               {supportLinks.map((link, index) => (
                 <li key={index}>
-                  <a
-                    href={link.href}
-                    className="text-gray-300 hover:text-pink-400 transition-colors duration-300 
-                               text-sm hover:underline block py-1"
-                  >
-                    {link.name}
-                  </a>
+                  {link.to.startsWith("#") ? (
+                    <a
+                      href={link.to}
+                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300 
+                                 text-sm hover:underline block py-1"
+                    >
+                      {link.name}
+                    </a>
+                  ) : (
+                    <Link
+                      to={link.to}
+                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300 
+                                 text-sm hover:underline block py-1"
+                    >
+                      {link.name}
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>
