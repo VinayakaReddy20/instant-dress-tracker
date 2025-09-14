@@ -1,7 +1,15 @@
+/* Optional charset first */
+@charset "utf-8";
+
+/* Google Fonts import first */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap');
+
+/* Then Tailwind directives */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap');
+
+/* Your custom styles */
 
 /* Premium Dress Tracker Design System */
 
@@ -205,4 +213,28 @@
     transform: scale(1);
     opacity: 1;
   }
+}
+
+/* Logo Styling */
+.logo {
+  @apply w-12 h-12 rounded-full shadow-md;
+  transition: var(--transition-bounce);
+}
+
+.logo:hover {
+  transform: scale(1.05) rotate(-2deg);
+}
+
+/* Typography */
+h1, h2, h3, h4 {
+  font-family: 'Playfair Display', serif;
+}
+
+body, p, span, button, input {
+  font-family: 'Inter', sans-serif;
+}
+
+/* Dark mode logo adjustments */
+.dark .logo {
+  filter: brightness(1.2) contrast(1.1);
 }

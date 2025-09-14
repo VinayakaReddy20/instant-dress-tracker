@@ -1,18 +1,23 @@
-# Welcome to your Lovable project
+# Instant Dress Tracker
 
-## Project info
+A modern web application that connects fashion enthusiasts with local boutiques, providing real-time inventory tracking for dresses. Shoppers can search, browse, and check availability instantly, while boutique owners can manage their inventory seamlessly.
 
-**URL**: https://lovable.dev/projects/feff09c8-5915-4aa9-b78d-0d76b6c0d14a
+## Features
+
+- **Real-time Inventory Tracking**: See exactly what's available in local boutiques right now
+- **Advanced Search**: Find dresses by name, size, color, category, or shop location
+- **Shop Management**: Boutique owners can add, edit, and manage their dress inventory
+- **Shopping Cart**: Add items to cart and manage your selections
+- **Responsive Design**: Optimized for desktop and mobile devices
+- **User Authentication**: Secure login system for shop owners and customers
+- **Wishlist**: Save your favorite dresses for later
+- **Quick View**: Preview dress details without leaving the page
+
 
 ## How can I edit this code?
 
 There are several ways of editing your application.
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/feff09c8-5915-4aa9-b78d-0d76b6c0d14a) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
 
 **Use your preferred IDE**
 
@@ -59,15 +64,7 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
+- Supabase (Backend & Database)
 
-## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/feff09c8-5915-4aa9-b78d-0d76b6c0d14a) and click on Share -> Publish.
 
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)

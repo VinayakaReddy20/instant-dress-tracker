@@ -5,52 +5,47 @@ export type Json =
   | number
   | boolean
   | null
-  | { [key: string]: Json }
+  | { [key: string]: Json | undefined }
   | Json[];
 
-export interface Database {
+export type Database = {
+  __InternalSupabase: {
+    PostgresVersion: "13.0.4";
+  };
   public: {
     Tables: {
       shop_owners: {
         Row: {
           id: string;
           user_id: string;
-          full_name: string | null;
-          phone: string | null;
-          profile_image_url: string | null;
-          business_name: string | null;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
           user_id: string;
-          full_name?: string | null;
-          phone?: string | null;
-          profile_image_url?: string | null;
-          business_name?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
           user_id?: string;
-          full_name?: string | null;
-          phone?: string | null;
-          profile_image_url?: string | null;
-          business_name?: string | null;
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
 
       shops: {
         Row: {
           id: string;
+          owner_id: string;
           name: string;
+          full_name: string | null;
+          phone: string | null;
+          business_name: string | null;
           location: string;
           address: string;
-          phone: string | null;
           rating: number | null;
           review_count: number | null;
           hours: string | null;
@@ -59,40 +54,52 @@ export interface Database {
           image_url: string | null;
           created_at: string;
           updated_at: string;
-          owner_id: string;
         };
         Insert: {
           id?: string;
-          name?: string;
+          owner_id: string;
+          name: string;
+          full_name?: string | null;
+          phone?: string | null;
+          business_name?: string | null;
           location?: string;
           address?: string;
-          phone?: string | null;
           rating?: number | null;
           review_count?: number | null;
           hours?: string | null;
           specialties?: string[] | null;
           description?: string | null;
           image_url?: string | null;
-          owner_id: string;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
+          owner_id?: string;
           name?: string;
+          full_name?: string | null;
+          phone?: string | null;
+          business_name?: string | null;
           location?: string;
           address?: string;
-          phone?: string | null;
           rating?: number | null;
           review_count?: number | null;
           hours?: string | null;
           specialties?: string[] | null;
           description?: string | null;
           image_url?: string | null;
-          owner_id?: string;
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "shops_owner_id_fkey";
+            columns: ["owner_id"];
+            isOneToOne: true;
+            referencedRelation: "shop_owners";
+            referencedColumns: ["id"];
+          }
+        ];
       };
 
       dresses: {
@@ -117,7 +124,7 @@ export interface Database {
           shop_id: string;
           name: string;
           price?: number;
-          stock?: number;
+          stock?: number | null;
           size: string;
           color?: string;
           category?: string;
@@ -133,7 +140,7 @@ export interface Database {
           shop_id?: string;
           name?: string;
           price?: number;
-          stock?: number;
+          stock?: number | null;
           size?: string;
           color?: string;
           category?: string;
@@ -144,23 +151,43 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "dresses_shop_id_fkey";
+            columns: ["shop_id"];
+            isOneToOne: false;
+            referencedRelation: "shops";
+            referencedColumns: ["id"];
+          }
+        ];
       };
     };
 
-    Views: {
-      [_ in never]: never;
-    };
-
-    Functions: {
-      [_ in never]: never;
-    };
-
-    Enums: {
-      [_ in never]: never;
-    };
-
-    CompositeTypes: {
-      [_ in never]: never;
-    };
+    Views: { [_ in never]: never };
+    Functions: { [_ in never]: never };
+    Enums: { [_ in never]: never };
+    CompositeTypes: { [_ in never]: never };
   };
-}
+};
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">;
+type DefaultSchema = DatabaseWithoutInternals["public"];
+
+
+// ---------------- Tables ----------------
+export type Tables<T extends keyof DefaultSchema["Tables"]> =
+  DefaultSchema["Tables"][T]["Row"];
+
+export type TablesInsert<T extends keyof DefaultSchema["Tables"]> =
+  DefaultSchema["Tables"][T]["Insert"];
+
+export type TablesUpdate<T extends keyof DefaultSchema["Tables"]> =
+  DefaultSchema["Tables"][T]["Update"];
+
+
+// ---------------- Constants ----------------
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const;
