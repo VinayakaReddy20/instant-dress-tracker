@@ -251,23 +251,7 @@ const Landing = () => {
   //   });
   // };
 
-  const testimonials = [
-    {
-      name: "Priya Sharma",
-      comment: "Found my dream wedding dress in minutes! The real-time inventory saved me from visiting multiple stores.",
-      rating: 5
-    },
-    {
-      name: "Rahul",
-      comment: "As a boutique owner, this platform has increased my sales by 40%. Customers love checking availability online.",
-      rating: 5
-    },
-    {
-      name: "Sneha Patel",
-      comment: "The search functionality is amazing. Found exactly what I was looking for in my size and budget!",
-      rating: 4
-    }
-  ];
+
 
   // Cart total quantity
   const totalCartQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
