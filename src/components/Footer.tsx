@@ -1,11 +1,6 @@
-<<<<<<< HEAD
 import { Facebook, Instagram, Twitter, Mail, Phone, MapPin, User } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
-=======
-import { Facebook, Instagram, Twitter, Mail, Phone, MapPin } from "lucide-react";
-import { Link } from "react-router-dom";
->>>>>>> 8cbccc3fc790eb12482d4f0161e7d7233234c207
 
 const Footer = () => {
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
@@ -13,7 +8,6 @@ const Footer = () => {
 
   const customerLinks = [
     { name: "Browse Dresses", to: "/dresses" },
-<<<<<<< HEAD
     { name: "Find Shops", to: "/shops" }
   ];
 
@@ -23,27 +17,7 @@ const Footer = () => {
 
   const supportLinks = [
     { name: "Feedback", to: "#" },
-    
-=======
-    { name: "Find Shops", to: "/shops" },
-    { name: "Style Advice", to: "#" },
-    { name: "FAQs", to: "#" }
   ];
-
-  const companyLinks = [
-    { name: "About Us", to: "#about" },
-    { name: "Our Partners", to: "#" },
-    { name: "Careers", to: "#" },
-  ];
-
-  const supportLinks = [
-    { name: "Contact Us", to: "#" },
-    { name: "Privacy Policy", to: "#" }
->>>>>>> 8cbccc3fc790eb12482d4f0161e7d7233234c207
-  ];
-
-  
-  
 
   const paymentMethods = [
     "Visa", "Mastercard", "PayPal", "Apple Pay", "Google Pay"
@@ -84,7 +58,7 @@ const Footer = () => {
       <div className="container mx-auto px-4 py-12">
         {/* Main Footer Content */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12">
-          
+
           {/* Brand Section */}
           <div className="lg:col-span-2 space-y-6">
             <div className="flex items-center space-x-3">
@@ -97,13 +71,13 @@ const Footer = () => {
               </div>
             </div>
             <p className="text-gray-300 text-sm leading-relaxed max-w-md">
-              Your ultimate destination for luxury dress shopping with real-time inventory tracking 
+              Your ultimate destination for luxury dress shopping with real-time inventory tracking
               and seamless shop discovery across partner boutiques and stores.
             </p>
-            
+
             {/* Contact Info */}
-            
-            
+
+
           </div>
 
           {/* Customer Links */}
@@ -115,7 +89,7 @@ const Footer = () => {
                   {link.to.startsWith("#") ? (
                     <a
                       href={link.to}
-                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300 
+                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300
                                  text-sm hover:underline block py-1"
                     >
                       {link.name}
@@ -123,7 +97,7 @@ const Footer = () => {
                   ) : (
                     <Link
                       to={link.to}
-                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300 
+                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300
                                  text-sm hover:underline block py-1"
                     >
                       {link.name}
@@ -143,7 +117,7 @@ const Footer = () => {
                   {link.to.startsWith("#") ? (
                     <a
                       href={link.to}
-                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300 
+                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300
                                  text-sm hover:underline block py-1"
                     >
                       {link.name}
@@ -151,7 +125,7 @@ const Footer = () => {
                   ) : (
                     <Link
                       to={link.to}
-                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300 
+                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300
                                  text-sm hover:underline block py-1"
                     >
                       {link.name}
@@ -168,7 +142,6 @@ const Footer = () => {
             <ul className="space-y-3">
               {supportLinks.map((link, index) => (
                 <li key={index}>
-<<<<<<< HEAD
                   {link.name === "Feedback" ? (
                     <button
                       onClick={() => setShowFeedbackForm(true)}
@@ -177,12 +150,9 @@ const Footer = () => {
                       {link.name}
                     </button>
                   ) : link.to.startsWith("#") ? (
-=======
-                  {link.to.startsWith("#") ? (
->>>>>>> 8cbccc3fc790eb12482d4f0161e7d7233234c207
                     <a
                       href={link.to}
-                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300 
+                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300
                                  text-sm hover:underline block py-1"
                     >
                       {link.name}
@@ -190,7 +160,7 @@ const Footer = () => {
                   ) : (
                     <Link
                       to={link.to}
-                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300 
+                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300
                                  text-sm hover:underline block py-1"
                     >
                       {link.name}
@@ -203,9 +173,9 @@ const Footer = () => {
 
         </div>
 
-        
 
-       
+
+
         {/* Bottom Section */}
         <div className="mt-8 pt-8 border-t border-gray-700">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
@@ -213,7 +183,7 @@ const Footer = () => {
               © 2025 DressTracker. All rights reserved.
             </p>
             <div className="flex flex-wrap justify-center md:justify-end space-x-6">
-              
+
             </div>
           </div>
         </div>
@@ -257,7 +227,3 @@ const Footer = () => {
 };
 
 export default Footer;
-<<<<<<< HEAD
-
-=======
->>>>>>> 8cbccc3fc790eb12482d4f0161e7d7233234c207
