@@ -1,9 +1,8 @@
-// src/pages/Dresses.tsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Search, Filter, MapPin, Package, Eye, Heart, ArrowLeft, ShoppingCart } from "lucide-react";
+import { Search, Filter, MapPin, Package, Eye, ArrowLeft, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,12 +14,14 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/Navbar";
-import { supabase } from "@/integrations/supabaseClient"; // ✅ corrected path
-import type { Database } from "@/types/database.types"; // supabase types
+import { supabase } from "@/integrations/supabaseClient";
+import type { Database } from "@/types/database.types";
 import { useCart } from "@/contexts/CartContext";
+import { useAuthModal } from "@/contexts/AuthModalContext";
 import { searchSchema, type SearchFormData } from "@/lib/validations";
+import { toast } from "@/components/ui/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 
-// Dress type derived from Supabase
 type DressRow = Database["public"]["Tables"]["dresses"]["Row"];
 type ShopRow = Database["public"]["Tables"]["shops"]["Row"];
 
@@ -31,6 +32,7 @@ interface Dress extends DressRow {
 const Dresses = () => {
   const navigate = useNavigate();
   const { addToCart } = useCart();
+  const isMobile = useIsMobile();
 
   const form = useForm<SearchFormData>({
     resolver: zodResolver(searchSchema),
@@ -48,7 +50,6 @@ const Dresses = () => {
   const [shops, setShops] = useState<Pick<ShopRow, "name">[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch dresses with real-time updates
   useEffect(() => {
     fetchDresses();
     const dressesChannel = supabase
@@ -62,7 +63,6 @@ const Dresses = () => {
     };
   }, []);
 
-  // Fetch shops with real-time updates
   useEffect(() => {
     fetchShops();
     const shopsChannel = supabase
@@ -76,7 +76,6 @@ const Dresses = () => {
     };
   }, []);
 
-  // Fetch dresses with shops join
   const fetchDresses = async () => {
     try {
       const { data, error } = await supabase
@@ -102,7 +101,6 @@ const Dresses = () => {
     }
   };
 
-  // Fetch shops list for filter
   const fetchShops = async () => {
     try {
       const { data, error } = await supabase
@@ -117,7 +115,6 @@ const Dresses = () => {
     }
   };
 
-  // Filtering logic
   let filteredDresses = dresses.filter((dress) => {
     const matchesSearch =
       dress.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -139,7 +136,6 @@ const Dresses = () => {
     return matchesSearch && matchesCategory && matchesSize && matchesShop;
   });
 
-  // Sorting logic
   if (sortBy === "newest") {
     filteredDresses = filteredDresses.sort((a, b) => {
       const dateA = new Date(a.created_at || "");
@@ -153,6 +149,53 @@ const Dresses = () => {
   } else if (sortBy === "stock") {
     filteredDresses = filteredDresses.sort((a, b) => (b.stock || 0) - (a.stock || 0));
   }
+
+  // Customer authentication check for addToCart
+  const { openModal } = useAuthModal();
+
+  const handleAddToCart = (dress: Dress) => {
+    // Temporarily force modal to open for testing
+    openModal(() => {
+      addToCart({
+        id: dress.id,
+        name: dress.name,
+        price: dress.price,
+        size: dress.size,
+        color: dress.color || undefined,
+        category: dress.category || undefined,
+        image_url: dress.image_url || undefined,
+        shop_id: dress.shop_id,
+        shop: dress.shops ? { name: dress.shops.name, location: dress.shops.location } : undefined
+      });
+      toast({
+        title: "Added to cart!",
+        description: `${dress.name} has been added to your cart.`,
+      });
+    });
+    /*
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) {
+        openModal(() => handleAddToCart(dress));
+      } else {
+        addToCart({
+          id: dress.id,
+          name: dress.name,
+          price: dress.price,
+          size: dress.size,
+          color: dress.color || undefined,
+          category: dress.category || undefined,
+          image_url: dress.image_url || undefined,
+          shop_id: dress.shop_id,
+          shop: dress.shops ? { name: dress.shops.name, location: dress.shops.location } : undefined
+        });
+        toast({
+          title: "Added to cart!",
+          description: `${dress.name} has been added to your cart.`,
+        });
+      }
+    });
+    */
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -293,13 +336,7 @@ const Dresses = () => {
                         alt={dress.name}
                         className="w-full h-64 object-cover"
                       />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="absolute top-2 right-2 w-8 h-8 p-0 bg-white/80 hover:bg-white"
-                      >
-                        <Heart className="w-4 h-4" />
-                      </Button>
+
                       <Badge
                         variant={
                           dress.stock && dress.stock > 3
@@ -346,17 +383,7 @@ const Dresses = () => {
                       <div className="flex gap-2">
                         <Button
                           className="flex-1"
-                          onClick={() => addToCart({
-                            id: dress.id,
-                            name: dress.name,
-                            price: dress.price,
-                            size: dress.size,
-                            color: dress.color || undefined,
-                            category: dress.category || undefined,
-                            image_url: dress.image_url || undefined,
-                            shop_id: dress.shop_id,
-                            shop: dress.shops ? { name: dress.shops.name, location: dress.shops.location } : undefined
-                          })}
+                          onClick={() => handleAddToCart(dress)}
                         >
                           <ShoppingCart className="w-4 h-4 mr-2" />
                           Add to Cart
@@ -364,7 +391,15 @@ const Dresses = () => {
                         <Button
                           variant="outline"
                           className="flex-1"
-                          onClick={() => navigate(`/dress/${dress.id}`)}
+                          onClick={() => {
+                            supabase.auth.getSession().then(({ data }) => {
+                              if (!data.session) {
+                                openModal(() => navigate(`/dress/${dress.id}`));
+                              } else {
+                                navigate(`/dress/${dress.id}`);
+                              }
+                            });
+                          }}
                         >
                           <Eye className="w-4 h-4 mr-2" />
                           View Details
