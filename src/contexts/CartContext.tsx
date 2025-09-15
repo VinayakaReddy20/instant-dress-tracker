@@ -1,4 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
+import { supabase } from "@/integrations/supabaseClient";
+import { toast } from "@/components/ui/use-toast";
+import { useAuthModal } from "@/contexts/AuthModalContext";
 
 export interface CartItem {
   id: string;
@@ -26,8 +29,17 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
+  const { openModal } = useAuthModal();
 
-  const addToCart = (item: Omit<CartItem, "quantity">) => {
+  const addToCart = async (item: Omit<CartItem, "quantity">) => {
+    // Check if customer is logged in
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) {
+      // Trigger auth modal with callback to add to cart after login
+      openModal(() => addToCart(item));
+      return;
+    }
+
     setCart((prevCart) => {
       const existingItem = prevCart.find((i) => i.id === item.id);
       if (existingItem) {
@@ -37,6 +49,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       } else {
         return [...prevCart, { ...item, quantity: 1 }];
       }
+    });
+
+    toast({
+      title: "Added to cart!",
+      description: `${item.name} has been added to your cart.`,
     });
   };
 

@@ -3,11 +3,13 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabaseClient";
 import { useCart } from "@/contexts/CartContext";
+import { useAuthModal } from "@/contexts/AuthModalContext";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, ArrowLeft, ShoppingCart } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
 
 interface DressDetailType {
   id: string;
@@ -60,6 +62,34 @@ const DressDetail = () => {
     };
     fetchDress();
   }, [dressId]);
+
+  // Customer authentication check for addToCart
+  const { openModal } = useAuthModal();
+
+  const handleAddToCart = () => {
+    if (!dress) return;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) {
+        openModal(() => handleAddToCart());
+      } else {
+        addToCart({
+          id: dress.id,
+          name: dress.name,
+          price: dress.price,
+          size: dress.size,
+          color: dress.color || undefined,
+          category: dress.category || undefined,
+          image_url: dress.image_url || undefined,
+          shop_id: dress.shop_id,
+          shop: dress.shops ? { name: dress.shops.name, location: dress.shops.location } : undefined
+        });
+        toast({
+          title: "Added to cart!",
+          description: `${dress.name} has been added to your cart.`,
+        });
+      }
+    });
+  };
 
   if (loading) {
     return (
@@ -122,17 +152,7 @@ const DressDetail = () => {
             </div>
             <Button
               className="w-full"
-              onClick={() => addToCart({
-                id: dress.id,
-                name: dress.name,
-                price: dress.price,
-                size: dress.size,
-                color: dress.color || undefined,
-                category: dress.category || undefined,
-                image_url: dress.image_url || undefined,
-                shop_id: dress.shop_id,
-                shop: dress.shops ? { name: dress.shops.name, location: dress.shops.location } : undefined
-              })}
+              onClick={handleAddToCart}
               disabled={!dress.stock || dress.stock <= 0}
             >
               <ShoppingCart className="w-4 h-4 mr-2" />

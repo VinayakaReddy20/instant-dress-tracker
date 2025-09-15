@@ -8,6 +8,7 @@ import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/contexts/CartContext";
+import { useAuthModal } from "@/contexts/AuthModalContext";
 import { useToast } from "@/components/ui/use-toast";
 
 interface Shop {
@@ -40,6 +41,7 @@ const ShopDetail = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { addToCart } = useCart();
+  const { openModal } = useAuthModal();
 
   const [shop, setShop] = useState<Shop | null>(null);
   const [dresses, setDresses] = useState<Dress[]>([]);
@@ -201,20 +203,38 @@ const ShopDetail = () => {
                     <Button
                       className="flex-1 bg-gradient-to-r from-primary to-primary/80 text-white hover:from-primary/90 hover:to-primary/70"
                       onClick={() => {
-                        addToCart({
-                          id: dress.id,
-                          name: dress.name,
-                          price: dress.price,
-                          size: dress.size,
-                          color: dress.color,
-                          category: dress.category,
-                          image_url: dress.image_url,
-                          shop_id: shopId!,
-                          shop: { name: shop.name, location: shop.location }
-                        });
-                        toast({
-                          title: "Added to cart!",
-                          description: `${dress.name} has been added to your cart.`,
+                        supabase.auth.getSession().then(({ data }) => {
+                          if (!data.session) {
+                            openModal(() => {
+                              addToCart({
+                                id: dress.id,
+                                name: dress.name,
+                                price: dress.price,
+                                size: dress.size,
+                                color: dress.color,
+                                category: dress.category,
+                                image_url: dress.image_url,
+                                shop_id: shopId!,
+                                shop: { name: shop.name, location: shop.location }
+                              });
+                            });
+                          } else {
+                            addToCart({
+                              id: dress.id,
+                              name: dress.name,
+                              price: dress.price,
+                              size: dress.size,
+                              color: dress.color,
+                              category: dress.category,
+                              image_url: dress.image_url,
+                              shop_id: shopId!,
+                              shop: { name: shop.name, location: shop.location }
+                            });
+                            toast({
+                              title: "Added to cart!",
+                              description: `${dress.name} has been added to your cart.`,
+                            });
+                          }
                         });
                       }}
                     >
@@ -224,7 +244,15 @@ const ShopDetail = () => {
                     <Button
                       variant="outline"
                       className="flex-1"
-                      onClick={() => navigate(`/dress/${dress.id}`)}
+                      onClick={() => {
+                        supabase.auth.getSession().then(({ data }) => {
+                          if (!data.session) {
+                            openModal(() => navigate(`/dress/${dress.id}`));
+                          } else {
+                            navigate(`/dress/${dress.id}`);
+                          }
+                        });
+                      }}
                     >
                       View Details
                     </Button>

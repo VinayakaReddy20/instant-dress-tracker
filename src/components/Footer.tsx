@@ -1,9 +1,30 @@
+<<<<<<< HEAD
+import { Facebook, Instagram, Twitter, Mail, Phone, MapPin, User } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useState } from "react";
+=======
 import { Facebook, Instagram, Twitter, Mail, Phone, MapPin } from "lucide-react";
 import { Link } from "react-router-dom";
+>>>>>>> 8cbccc3fc790eb12482d4f0161e7d7233234c207
 
 const Footer = () => {
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+
   const customerLinks = [
     { name: "Browse Dresses", to: "/dresses" },
+<<<<<<< HEAD
+    { name: "Find Shops", to: "/shops" }
+  ];
+
+  const companyLinks = [
+    { name: "About Us", to: "#about" }
+  ];
+
+  const supportLinks = [
+    { name: "Feedback", to: "#" },
+    
+=======
     { name: "Find Shops", to: "/shops" },
     { name: "Style Advice", to: "#" },
     { name: "FAQs", to: "#" }
@@ -18,23 +39,45 @@ const Footer = () => {
   const supportLinks = [
     { name: "Contact Us", to: "#" },
     { name: "Privacy Policy", to: "#" }
+>>>>>>> 8cbccc3fc790eb12482d4f0161e7d7233234c207
   ];
 
-  const socialLinks = [
-    { icon: Facebook, href: "#", label: "Facebook" },
-    { icon: Instagram, href: "#", label: "Instagram" },
-    { icon: Twitter, href: "#", label: "Twitter" }
-  ];
-
-  const contactInfo = [
-    { icon: Phone, text: "+91 9380111579" },
-    { icon: Mail, text: "support@dresstracker.com" },
-    { icon: MapPin, text: "Ballari, Karnataka" }
-  ];
+  
+  
 
   const paymentMethods = [
     "Visa", "Mastercard", "PayPal", "Apple Pay", "Google Pay"
   ];
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feedbackText.trim()) return;
+
+    try {
+      // Send feedback email via backend API or email service
+      // Here, we simulate sending email by calling a backend endpoint
+      const response = await fetch("/api/send-feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: "vinaysdr02@gmail.com",
+          subject: "New Feedback from DressTracker",
+          message: feedbackText.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to send feedback");
+      }
+
+      alert("Thank you for your feedback!");
+      setFeedbackText("");
+      setShowFeedbackForm(false);
+    } catch (error) {
+      alert("Error sending feedback. Please try again later.");
+      console.error(error);
+    }
+  };
 
   return (
     <footer className="bg-gray-900 text-white">
@@ -59,29 +102,8 @@ const Footer = () => {
             </p>
             
             {/* Contact Info */}
-            <div className="space-y-3">
-              {contactInfo.map((item, index) => (
-                <div key={index} className="flex items-center space-x-3">
-                  <item.icon className="w-4 h-4 text-pink-400" />
-                  <span className="text-sm text-gray-300">{item.text}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Social Links */}
-            <div className="flex space-x-4">
-              {socialLinks.map((social, index) => (
-                <a
-                  key={index}
-                  href={social.href}
-                  aria-label={social.label}
-                  className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center 
-                             hover:bg-pink-500 hover:scale-110 transition-all duration-300 group"
-                >
-                  <social.icon className="w-5 h-5 text-gray-300 group-hover:text-white transition-colors duration-300" />
-                </a>
-              ))}
-            </div>
+            
+            
           </div>
 
           {/* Customer Links */}
@@ -146,7 +168,18 @@ const Footer = () => {
             <ul className="space-y-3">
               {supportLinks.map((link, index) => (
                 <li key={index}>
+<<<<<<< HEAD
+                  {link.name === "Feedback" ? (
+                    <button
+                      onClick={() => setShowFeedbackForm(true)}
+                      className="text-gray-300 hover:text-pink-400 transition-colors duration-300 text-sm hover:underline block py-1"
+                    >
+                      {link.name}
+                    </button>
+                  ) : link.to.startsWith("#") ? (
+=======
                   {link.to.startsWith("#") ? (
+>>>>>>> 8cbccc3fc790eb12482d4f0161e7d7233234c207
                     <a
                       href={link.to}
                       className="text-gray-300 hover:text-pink-400 transition-colors duration-300 
@@ -180,21 +213,51 @@ const Footer = () => {
               © 2025 DressTracker. All rights reserved.
             </p>
             <div className="flex flex-wrap justify-center md:justify-end space-x-6">
-              <a href="#" className="text-gray-400 hover:text-pink-400 text-sm hover:underline">
-                Terms of Service
-              </a>
-              <a href="#" className="text-gray-400 hover:text-pink-400 text-sm hover:underline">
-                Privacy Policy
-              </a>
-              <a href="#" className="text-gray-400 hover:text-pink-400 text-sm hover:underline">
-                Cookie Policy
-              </a>
+              
             </div>
           </div>
         </div>
       </div>
-    </footer>
+
+      {/* Feedback Modal */}
+      {showFeedbackForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-xl font-semibold mb-4">Send Feedback</h3>
+            <form onSubmit={handleSubmit}>
+              <textarea
+                className="w-full border border-gray-300 rounded-md p-2 mb-4"
+                rows={5}
+                placeholder="Enter your feedback here..."
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                required
+              />
+              <div className="flex justify-end space-x-4">
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                  onClick={() => setShowFeedbackForm(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-pink-500 text-white rounded hover:bg-pink-600"
+                >
+                  Send
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+  )}
+</footer>
   );
 };
 
 export default Footer;
+<<<<<<< HEAD
+
+=======
+>>>>>>> 8cbccc3fc790eb12482d4f0161e7d7233234c207
