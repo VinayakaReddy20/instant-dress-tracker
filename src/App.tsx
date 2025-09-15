@@ -15,8 +15,12 @@ import Dashboard from "./pages/Dashboard";
 import SearchResults from "./pages/SearchResults";
 import NotFound from "./pages/NotFound";
 import AuthModal from "@/components/AuthModal";
+import CustomerAuthModal from "@/components/CustomerAuthModal";
+import CustomerAuth from "./pages/CustomerAuth";
 import { supabase } from "@/integrations/supabaseClient";
 import { CartProvider } from "@/contexts/CartContext";
+import { AuthModalProvider, useAuthModal } from "@/contexts/AuthModalContext";
+import { CustomerAuthProvider } from "@/contexts/CustomerAuthContext";
 
 const queryClient = new QueryClient();
 
@@ -44,10 +48,11 @@ const ProtectedRoute: React.FC<{ children: JSX.Element | null }> = ({ children }
   return children;
 };
 
-// --- Main App ---
-const App: React.FC = () => {
+// --- App Content Component ---
+const AppContent: React.FC = () => {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [ownerId, setOwnerId] = useState<string | null>(null);
+  const { isOpen, closeModal } = useAuthModal();
 
   // Handle login success from AuthModal
   const handleLoginSuccess = (id: string) => {
@@ -75,40 +80,58 @@ const App: React.FC = () => {
   }, []);
 
   return (
+    <>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <AuthModal
+          isOpen={authModalOpen}
+          onClose={() => setAuthModalOpen(false)}
+          onLoginSuccess={handleLoginSuccess}
+        />
+        <CustomerAuthModal
+          isOpen={isOpen}
+          onClose={closeModal}
+        />
+
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/dresses" element={<Dresses />} />
+          <Route path="/dress/:dressId" element={<DressDetail />} />
+          <Route path="/shops" element={<Shops />} />
+          <Route path="/shop/:shopId" element={<ShopDetail />} />
+          <Route path="/search" element={<SearchResults />} />
+          <Route path="/customer-auth" element={<CustomerAuth />} />
+
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Catch-all */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </>
+  );
+};
+
+// --- Main App ---
+const App: React.FC = () => {
+  return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <CartProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AuthModal
-              isOpen={authModalOpen}
-              onClose={() => setAuthModalOpen(false)}
-              onLoginSuccess={handleLoginSuccess}
-            />
-
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/dresses" element={<Dresses />} />
-              <Route path="/dress/:dressId" element={<DressDetail />} />
-              <Route path="/shops" element={<Shops />} />
-              <Route path="/shop/:shopId" element={<ShopDetail />} />
-              <Route path="/search" element={<SearchResults />} />
-
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                }
-              />
-
-              {/* Catch-all */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </CartProvider>
+        <AuthModalProvider>
+          <CartProvider>
+            <CustomerAuthProvider>
+              <AppContent />
+            </CustomerAuthProvider>
+          </CartProvider>
+        </AuthModalProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

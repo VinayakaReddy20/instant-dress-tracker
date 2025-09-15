@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Store, Search, User, Menu, ShoppingCart } from "lucide-react";
+import { Store, Search, User, Menu, ShoppingCart, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import AuthModal from "@/components/AuthModal";
 import CartDrawer from "@/components/CartDrawer";
 import { useCart } from "@/contexts/CartContext";
+import { useCustomerAuth } from "@/contexts/CustomerAuthContext";
+import { useAuthModal } from "@/contexts/AuthModalContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface NavbarProps {
   onLogin?: () => void; // ✅ allow Dashboard to pass fetchDashboard
@@ -17,6 +20,9 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin }) => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const location = useLocation();
   const { totalQuantity } = useCart();
+  const { user, signOut } = useCustomerAuth();
+  const { openModal } = useAuthModal();
+  const isMobile = useIsMobile();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -25,6 +31,10 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin }) => {
     if (onLogin) {
       onLogin(); // ✅ notify parent (Dashboard)
     }
+  };
+
+  const handleCustomerLogin = () => {
+    openModal(() => {});
   };
 
   return (
@@ -79,13 +89,27 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin }) => {
                   </Badge>
                 )}
               </Button>
-              <Button
-                onClick={() => setIsAuthModalOpen(true)}
-                className="bg-primary text-white hover:bg-primary-dark flex items-center space-x-1 px-3 py-2 rounded-md"
-              >
-                <User className="w-4 h-4" />
-                <span>Shop Owner</span>
-              </Button>
+              {user ? (
+                <div className="flex items-center space-x-4">
+                  <span className="text-gray-700 font-medium">Hello, {user.email}</span>
+                  <Button
+                    variant="outline"
+                    onClick={() => signOut()}
+                    className="flex items-center space-x-1 px-3 py-2 rounded-md"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Logout</span>
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="bg-primary text-white hover:bg-primary-dark flex items-center space-x-1 px-3 py-2 rounded-md"
+                >
+                  <User className="w-4 h-4" />
+                  <span>Shop Owner</span>
+                </Button>
+              )}
             </div>
 
             {/* Mobile Menu Button */}

@@ -1,4 +1,3 @@
-// src/pages/Shops.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapPin, Star, Package, Phone, Clock, ArrowLeft, Search } from "lucide-react";
@@ -9,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/integrations/supabaseClient";
 import type { Database } from "@/types/database.types";
+import { useAuthModal } from "@/contexts/AuthModalContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Supabase types
 type ShopRow = Database["public"]["Tables"]["shops"]["Row"];
@@ -19,6 +20,8 @@ interface ShopWithCount extends ShopRow {
 
 const Shops = () => {
   const navigate = useNavigate();
+  const { openModal } = useAuthModal();
+  const isMobile = useIsMobile();
   const [shops, setShops] = useState<ShopWithCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -264,7 +267,15 @@ const Shops = () => {
 
                       <Button
                         className="w-full"
-                        onClick={() => navigate(`/shop/${shop.id}`)}
+                        onClick={() => {
+                          supabase.auth.getSession().then(({ data }) => {
+                            if (!data.session) {
+                              openModal(() => navigate(`/shop/${shop.id}`));
+                            } else {
+                              navigate(`/shop/${shop.id}`);
+                            }
+                          });
+                        }}
                       >
                         Visit Shop
                       </Button>
