@@ -80,7 +80,6 @@ const Landing = () => {
   const aboutRef = useRef<HTMLDivElement>(null);
   const featuredShopsRef = useRef<HTMLDivElement>(null);
   const newArrivalsRef = useRef<HTMLDivElement>(null);
-  const testimonialsRef = useRef<HTMLDivElement>(null);
   const newsletterRef = useRef<HTMLDivElement>(null);
 
   // Helper function to check if a dress is new (created within last 30 days)
@@ -250,8 +249,6 @@ const Landing = () => {
   //     description: `${dress.name} has been added to your cart.`,
   //   });
   // };
-
-
 
   // Cart total quantity
   const totalCartQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -863,30 +860,6 @@ const Landing = () => {
           ) : (
             <p className="text-center text-gray-500">No shops available</p>
           )}
-        </div>
-      </section>
-
-
-      {/* Testimonials */}
-      <section className="py-20 bg-white">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-playfair font-bold text-center mb-12">What Our Customers Say</h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <div key={index} className="bg-muted/30 p-6 rounded-2xl">
-                <div className="flex mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`w-4 h-4 ${i < testimonial.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
-                    />
-                  ))}
-                </div>
-                <p className="text-gray-600 mb-4">"{testimonial.comment}"</p>
-                <p className="font-semibold text-gray-800">{testimonial.name}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
