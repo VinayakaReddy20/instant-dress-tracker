@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, ChevronLeft, ChevronRight, Users, Shield, Heart, Star, ShoppingBag, Clock, MapPin, Eye, X, Filter, Grid, List, ShoppingCart, Plus, Minus, Trash2 } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Users, Shield, Star, ShoppingBag, Clock, MapPin, Eye, X, Filter, Grid, List, ShoppingCart, Plus, Minus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,9 @@ import Footer from "@/components/Footer";
 import heroBoutique from "@/assets/hero-boutique.jpg";
 import { supabase } from "@/integrations/supabaseClient";
 import { useCart } from "@/contexts/CartContext";
+import { useAuthModal } from "@/contexts/AuthModalContext";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Shop {
   id: string;
@@ -63,9 +65,9 @@ const Landing = () => {
   const [filteredDresses, setFilteredDresses] = useState<Dress[]>([]);
   const [selectedDress, setSelectedDress] = useState<Dress | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [wishlist, setWishlist] = useState<Set<string>>(new Set());
   const [sortOption, setSortOption] = useState("relevance");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const isMobile = useIsMobile();
 
   // New state for newsletter email input and loading
   const [email, setEmail] = useState("");
@@ -74,6 +76,9 @@ const Landing = () => {
   // Cart state replaced by useCart context
   // const [cart, setCart] = useState<CartItem[]>([]);
   const { cart, addToCart } = useCart();
+
+  // Customer authentication state
+  const [isCustomerLoggedIn, setIsCustomerLoggedIn] = useState<boolean | null>(null);
 
   const shopsRef = useRef<HTMLDivElement>(null);
   const dressesRef = useRef<HTMLDivElement>(null);
@@ -221,15 +226,7 @@ const Landing = () => {
     setSelectedDress(null);
   };
 
-  const toggleWishlist = (dressId: string) => {
-    const newWishlist = new Set(wishlist);
-    if (newWishlist.has(dressId)) {
-      newWishlist.delete(dressId);
-    } else {
-      newWishlist.add(dressId);
-    }
-    setWishlist(newWishlist);
-  };
+
 
   // const addToCart = (dress: Dress) => {
   //   setCart(prevCart => {
@@ -252,6 +249,23 @@ const Landing = () => {
 
   // Cart total quantity
   const totalCartQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Customer authentication check for addToCart
+  const { openModal } = useAuthModal();
+
+  const handleAddToCart = (dress: Dress) => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) {
+        openModal(() => handleAddToCart(dress));
+      } else {
+        addToCart(dress);
+        toast({
+          title: "Added to cart!",
+          description: `${dress.name} has been added to your cart.`,
+        });
+      }
+    });
+  };
 
   // Animation variants
   const fadeIn = {
@@ -425,7 +439,19 @@ const Landing = () => {
               <div ref={shopsRef} className="flex space-x-6 overflow-x-auto scroll-smooth snap-x scrollbar-hide py-4">
                 {filteredShops.map((shop) => (
                   <Card key={shop.id} className="min-w-[320px] flex-shrink-0 snap-start group hover:shadow-xl transition-all duration-300 border-0 shadow-md bg-white">
-                    <Link to={`/shop/${shop.id}`} className="block">
+                    <div className="block cursor-pointer" onClick={() => {
+                      // Temporarily force modal to open for testing
+                      openModal(() => navigate(`/shop/${shop.id}`));
+                      /*
+                      supabase.auth.getSession().then(({ data }) => {
+                        if (!data.session) {
+                          openModal(() => navigate(`/shop/${shop.id}`));
+                        } else {
+                          navigate(`/shop/${shop.id}`);
+                        }
+                      });
+                      */
+                    }}>
                       <div className="relative overflow-hidden rounded-t-xl">
                         <img
                           src={shop.image_url || "https://via.placeholder.com/400x300?text=Shop+Image"}
@@ -460,7 +486,7 @@ const Landing = () => {
                           Visit Shop
                         </Button>
                       </CardContent>
-                    </Link>
+                    </div>
                   </Card>
                 ))}
               </div>
@@ -506,15 +532,7 @@ const Landing = () => {
                           )}
                         </div>
 
-                        {/* Wishlist Button */}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="absolute top-3 right-3 w-9 h-9 p-0 bg-white/80 hover:bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-all duration-200"
-                          onClick={() => toggleWishlist(dress.id)}
-                        >
-                          <Heart className={`w-4 h-4 ${wishlist.has(dress.id) ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
-                        </Button>
+                        {/* Removed Wishlist Button */}
 
                         {/* Quick Actions Overlay */}
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
@@ -522,7 +540,15 @@ const Landing = () => {
                             variant="secondary"
                             size="sm"
                             className="bg-white hover:bg-gray-50 text-gray-900 font-medium shadow-lg"
-                            onClick={() => openQuickView(dress)}
+                            onClick={() => {
+                              supabase.auth.getSession().then(({ data }) => {
+                                if (!data.session) {
+                                  openModal(() => openQuickView(dress));
+                                } else {
+                                  openQuickView(dress);
+                                }
+                              });
+                            }}
                           >
                             <Eye className="w-4 h-4 mr-2" />
                             Quick View
@@ -571,7 +597,7 @@ const Landing = () => {
                       <CardFooter className="p-5 pt-0">
                         <Button
                           className="w-full bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-lg transition-all duration-200"
-                          onClick={() => { addToCart(dress); toast({ title: "Added to cart!", description: `${dress.name} has been added to your cart.` }); }}
+                          onClick={() => handleAddToCart(dress)}
                         >
                           <ShoppingCart className="w-4 h-4 mr-2" />
                           Add to Cart
@@ -659,7 +685,7 @@ const Landing = () => {
                           <div className="flex gap-3">
                             <Button
                               className="flex-1 bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-lg transition-all duration-200"
-                              onClick={() => { addToCart(dress); toast({ title: "Added to cart!", description: `${dress.name} has been added to your cart.` }); }}
+                              onClick={() => handleAddToCart(dress)}
                             >
                               <ShoppingCart className="w-4 h-4 mr-2" />
                               Add to Cart
@@ -668,15 +694,15 @@ const Landing = () => {
                               variant="outline"
                               size="sm"
                               className="px-4 border-gray-300 hover:bg-gray-50"
-                              onClick={() => toggleWishlist(dress.id)}
-                            >
-                              <Heart className={`w-4 h-4 ${wishlist.has(dress.id) ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="px-4 border-gray-300 hover:bg-gray-50"
-                              onClick={() => openQuickView(dress)}
+                              onClick={() => {
+                                supabase.auth.getSession().then(({ data }) => {
+                                  if (!data.session) {
+                                    openModal(() => openQuickView(dress));
+                                  } else {
+                                    openQuickView(dress);
+                                  }
+                                });
+                              }}
                             >
                               <Eye className="w-4 h-4" />
                             </Button>
@@ -770,7 +796,7 @@ const Landing = () => {
               variants={slideFromBottom}
             >
               <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Heart className="w-8 h-8 text-purple-600" />
+                <Users className="w-8 h-8 text-purple-600" />
               </div>
               <h3 className="text-xl font-semibold mb-3">Personalized Experience</h3>
               <p className="text-gray-600">
@@ -819,13 +845,7 @@ const Landing = () => {
                 <Badge variant="outline">{dress.size}</Badge>
               </div>
               <Button className="mt-3 w-full bg-gradient-to-r from-primary to-primary/80 text-white hover:from-primary/90 hover:to-primary/70"
-                onClick={() => {
-                  addToCart(dress);
-                  toast({
-                    title: "Added to cart!",
-                    description: `${dress.name} has been added to your cart.`,
-                  });
-                }}
+                onClick={() => { handleAddToCart(dress); }}
               >
                 Add to Cart
               </Button>
@@ -850,7 +870,19 @@ const Landing = () => {
                   <h3 className="text-xl font-semibold mt-4">{shop.name}</h3>
                   <p className="text-sm text-gray-500">{shop.location}</p>
               <Button className="mt-4 w-full bg-gradient-to-r from-primary to-primary/80 text-white hover:from-primary/90 hover:to-primary/70"
-                onClick={() => navigate(`/shop/${shop.id}`)}
+                onClick={() => {
+                  // Temporarily force modal to open for testing
+                  openModal(() => navigate(`/shop/${shop.id}`));
+                  /*
+                  supabase.auth.getSession().then(({ data }) => {
+                    if (!data.session) {
+                      openModal(() => navigate(`/shop/${shop.id}`));
+                    } else {
+                      navigate(`/shop/${shop.id}`);
+                    }
+                  });
+                  */
+                }}
               >
                 View Shop
               </Button>
@@ -970,13 +1002,10 @@ const Landing = () => {
                   )}
                 </div>
                 <div className="flex gap-3">
-                  <Button className="flex-1 bg-gradient-to-r from-primary to-primary/80 text-white" onClick={() => addToCart(selectedDress)}>
+                  <Button className="flex-1 bg-gradient-to-r from-primary to-primary/80 text-white" onClick={() => handleAddToCart(selectedDress)}>
                     Add to Cart
                   </Button>
-                  <Button variant="outline" onClick={() => toggleWishlist(selectedDress.id)}>
-                    <Heart className={`w-4 h-4 mr-2 ${wishlist.has(selectedDress.id) ? 'fill-red-500 text-red-500' : ''}`} />
-                    Wishlist
-                  </Button>
+                  {/* Removed Wishlist Button in Quick View Modal */}
                 </div>
               </div>
             </div>
