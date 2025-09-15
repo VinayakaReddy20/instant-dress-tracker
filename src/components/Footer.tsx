@@ -1,6 +1,11 @@
+<<<<<<< HEAD
 import { Facebook, Instagram, Twitter, Mail, Phone, MapPin, User } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
+=======
+import { Facebook, Instagram, Twitter, Mail, Phone, MapPin } from "lucide-react";
+import { Link } from "react-router-dom";
+>>>>>>> 8cbccc3fc790eb12482d4f0161e7d7233234c207
 
 const Footer = () => {
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
@@ -8,6 +13,7 @@ const Footer = () => {
 
   const customerLinks = [
     { name: "Browse Dresses", to: "/dresses" },
+<<<<<<< HEAD
     { name: "Find Shops", to: "/shops" }
   ];
 
@@ -18,6 +24,22 @@ const Footer = () => {
   const supportLinks = [
     { name: "Feedback", to: "#" },
     
+=======
+    { name: "Find Shops", to: "/shops" },
+    { name: "Style Advice", to: "#" },
+    { name: "FAQs", to: "#" }
+  ];
+
+  const companyLinks = [
+    { name: "About Us", to: "#about" },
+    { name: "Our Partners", to: "#" },
+    { name: "Careers", to: "#" },
+  ];
+
+  const supportLinks = [
+    { name: "Contact Us", to: "#" },
+    { name: "Privacy Policy", to: "#" }
+>>>>>>> 8cbccc3fc790eb12482d4f0161e7d7233234c207
   ];
 
   
@@ -146,6 +168,7 @@ const Footer = () => {
             <ul className="space-y-3">
               {supportLinks.map((link, index) => (
                 <li key={index}>
+<<<<<<< HEAD
                   {link.name === "Feedback" ? (
                     <button
                       onClick={() => setShowFeedbackForm(true)}
@@ -154,6 +177,9 @@ const Footer = () => {
                       {link.name}
                     </button>
                   ) : link.to.startsWith("#") ? (
+=======
+                  {link.to.startsWith("#") ? (
+>>>>>>> 8cbccc3fc790eb12482d4f0161e7d7233234c207
                     <a
                       href={link.to}
                       className="text-gray-300 hover:text-pink-400 transition-colors duration-300 
@@ -231,4 +257,7 @@ const Footer = () => {
 };
 
 export default Footer;
+<<<<<<< HEAD
 
+=======
+>>>>>>> 8cbccc3fc790eb12482d4f0161e7d7233234c207
