@@ -15,19 +15,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/integrations/supabaseClient";
-import type { Database } from "@/types/database.types";
 import { useCart } from "@/contexts/CartContext";
 import { useAuthModal } from "@/contexts/AuthModalContext";
 import { searchSchema, type SearchFormData } from "@/lib/validations";
 import { toast } from "@/components/ui/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-type DressRow = Database["public"]["Tables"]["dresses"]["Row"];
-type ShopRow = Database["public"]["Tables"]["shops"]["Row"];
-
-interface Dress extends DressRow {
-  shops: Pick<ShopRow, "name" | "location"> | null;
-}
+import { logApiError, debugLog } from "@/lib/errorHandling";
+import type { Dress } from "@/types/shared";
 
 const Dresses = () => {
   const navigate = useNavigate();
@@ -47,7 +42,7 @@ const Dresses = () => {
   const [selectedShop, setSelectedShop] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
   const [dresses, setDresses] = useState<Dress[]>([]);
-  const [shops, setShops] = useState<Pick<ShopRow, "name">[]>([]);
+  const [shops, setShops] = useState<Pick<import("@/types/shared").ShopRow, "name">[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -78,24 +73,85 @@ const Dresses = () => {
 
   const fetchDresses = async () => {
     try {
-      const { data, error } = await supabase
+      setLoading(true);
+
+      // First, test basic connectivity with a simple query
+      debugLog("Testing basic dresses query...");
+      const { data: testData, error: testError } = await supabase
         .from("dresses")
-        .select(
-          `
+        .select("id")
+        .limit(1);
+
+      if (testError) {
+        logApiError("Basic dresses query test", testError);
+        throw new Error(`Database connectivity test failed: ${testError.message}`);
+      }
+
+      debugLog("Basic query successful, proceeding with full query...");
+
+      // Build the main query
+      const query = supabase
+        .from("dresses")
+        .select(`
           *,
           shops (
             name,
             location
           )
-        `
-        )
+        `)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      debugLog("Executing main dresses query...");
 
-      setDresses((data as Dress[]) ?? []);
-    } catch (error) {
-      console.error("Error fetching dresses:", error);
+      const { data, error } = await query;
+
+      if (error) {
+        logApiError("Main dresses query", error);
+        throw error;
+      }
+
+      if (data) {
+        debugLog(`Successfully fetched ${data.length} dresses`);
+
+        setDresses((data as Dress[]) ?? []);
+
+        // Show success message in development
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`✅ Successfully loaded ${data.length} dresses`);
+        }
+      } else {
+        debugLog("No dresses data returned");
+        setDresses([]);
+      }
+    } catch (error: unknown) {
+      logApiError("fetchDresses", error);
+
+      // Provide more specific error messages based on error type
+      let title = "Failed to load dresses";
+      let description = "Please check your connection and try again.";
+
+      if (error && typeof error === 'object' && 'code' in error) {
+        const err = error as { code?: string; message?: string };
+        if (err.code === 'PGRST116') {
+          title = "Database connection issue";
+          description = "Unable to connect to the database. Please try again later.";
+        } else if (err.code === '42P01') {
+          title = "Table not found";
+          description = "The dresses table doesn't exist. Please contact support.";
+        } else if (err.code === '42703') {
+          title = "Column error";
+          description = "There's an issue with the database schema. Please contact support.";
+        }
+      }
+
+      toast({
+        variant: "destructive",
+        title,
+        description,
+      });
+
+      // Set empty array on error to prevent UI crashes
+      setDresses([]);
     } finally {
       setLoading(false);
     }
@@ -159,13 +215,13 @@ const Dresses = () => {
       addToCart({
         id: dress.id,
         name: dress.name,
-        price: dress.price,
+        price: dress.price || 0,
         size: dress.size,
         color: dress.color || undefined,
         category: dress.category || undefined,
         image_url: dress.image_url || undefined,
         shop_id: dress.shop_id,
-        shop: dress.shops ? { name: dress.shops.name, location: dress.shops.location } : undefined
+        shop: dress.shops ? { name: dress.shops.name, location: dress.shops.location ?? "" } : undefined
       });
       toast({
         title: "Added to cart!",
@@ -375,7 +431,7 @@ const Dresses = () => {
                             )}
                           </div>
                           <span className="text-lg font-semibold text-primary">
-                            ₹{Number(dress.price).toLocaleString("en-IN")}
+                            ₹{Number(dress.price || 0).toLocaleString("en-IN")}
                           </span>
                         </div>
                       </div>

@@ -1,10 +1,7 @@
-/* Optional charset first */
 @charset "utf-8";
 
-/* Google Fonts import first */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap');
 
-/* Then Tailwind directives */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -127,7 +124,8 @@
   }
 
   body {
-    @apply bg-background text-foreground font-inter;
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
   }
 }
 

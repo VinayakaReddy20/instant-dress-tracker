@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Loader2,
   Store,
-  Shirt,
   CheckCircle2,
   XCircle,
   PlusCircle,
@@ -30,7 +29,7 @@ interface Shop {
   id: string;
   name: string;
   location: string;
-  address: string;
+  address?: string;
   phone?: string;
   rating?: number;
   review_count?: number;
@@ -40,6 +39,8 @@ interface Shop {
   image_url?: string;
   full_name?: string;
   business_name?: string;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface DressFormData {
@@ -548,7 +549,19 @@ export default function Dashboard() {
               <CardContent>
                 {editingShop ? (
                   <ShopEditForm
-                    initialData={shop}
+                    initialData={{
+                      id: shop.id,
+                      name: shop.name,
+                      location: shop.location,
+                      address: shop.address ?? "",
+                      description: shop.description ?? "",
+                      image_url: shop.image_url ?? "",
+                      full_name: shop.full_name ?? "",
+                      phone: shop.phone ?? "",
+                      business_name: shop.business_name ?? "",
+                      hours: shop.hours ?? "",
+                      specialties: shop.specialties ?? [],
+                    }}
                     onSave={handleShopFormSave}
                     onCancel={handleShopFormCancel}
                   />

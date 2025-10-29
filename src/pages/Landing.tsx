@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, ChevronLeft, ChevronRight, Users, Shield, Star, ShoppingBag, Clock, MapPin, Eye, X, Filter, Grid, List, ShoppingCart, Plus, Minus, Trash2 } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { ChevronLeft, ChevronRight, Users, Shield, Star, MapPin, Eye, X, ShoppingCart, Search, Filter, Grid, List } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { motion } from "framer-motion";
@@ -15,77 +15,57 @@ import { useCart } from "@/contexts/CartContext";
 import { useAuthModal } from "@/contexts/AuthModalContext";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { debugLog, logApiError } from "@/lib/errorHandling";
 
-interface Shop {
-  id: string;
-  name: string;
-  location: string;
-  image_url?: string;
-}
+import type { Database } from "@/integrations/supabase/types";
 
-interface Dress {
-  id: string;
-  name: string;
-  price: number;
-  size: string;
-  color?: string;
-  category?: string;
-  image_url?: string;
-  created_at?: string;
-  shop_id: string;
-  shop?: { name: string; location: string };
-}
+// Use database schema types
+type Shop = Database["public"]["Tables"]["shops"]["Row"];
 
-interface DressWithShop {
-  id: string;
-  shop_id: string;
-  name: string;
-  price: number;
-  size: string;
-  color: string;
-  category: string;
-  image_url: string | null;
-  shops: {
-    name: string;
-    location: string;
-  } | null;
-}
+type Dress = Database["public"]["Tables"]["dresses"]["Row"] & {
+  shops?: { name: string; location: string | null; };
+};
 
-interface CartItem extends Dress {
+type CartItem = Dress & {
   quantity: number;
-}
+};
 
 const Landing = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [searchQuery, setSearchQuery] = useState("");
   const [shops, setShops] = useState<Shop[]>([]);
   const [dresses, setDresses] = useState<Dress[]>([]);
-  const [filteredShops, setFilteredShops] = useState<Shop[]>([]);
-  const [filteredDresses, setFilteredDresses] = useState<Dress[]>([]);
   const [selectedDress, setSelectedDress] = useState<Dress | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [sortOption, setSortOption] = useState("relevance");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const isMobile = useIsMobile();
+  const [loading, setLoading] = useState(false);
 
   // New state for newsletter email input and loading
   const [email, setEmail] = useState("");
   const [isSubscribing, setIsSubscribing] = useState(false);
 
-  // Cart state replaced by useCart context
-  // const [cart, setCart] = useState<CartItem[]>([]);
   const { cart, addToCart } = useCart();
 
-  // Customer authentication state
-  const [isCustomerLoggedIn, setIsCustomerLoggedIn] = useState<boolean | null>(null);
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredShops, setFilteredShops] = useState<Shop[]>([]);
+  const [filteredDresses, setFilteredDresses] = useState<Dress[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
+  const [sortOption, setSortOption] = useState("relevance");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
+
+  // Get unique filter options
+  const uniqueCategories = [...new Set(dresses.map(d => d.category).filter(Boolean))] as string[];
+  const uniqueSizes = [...new Set(dresses.map(d => d.size))];
+  const uniqueColors = [...new Set(dresses.map(d => d.color).filter(Boolean))] as string[];
 
   const shopsRef = useRef<HTMLDivElement>(null);
-  const dressesRef = useRef<HTMLDivElement>(null);
-  const aboutRef = useRef<HTMLDivElement>(null);
-  const featuredShopsRef = useRef<HTMLDivElement>(null);
-  const newArrivalsRef = useRef<HTMLDivElement>(null);
-  const newsletterRef = useRef<HTMLDivElement>(null);
 
   // Helper function to check if a dress is new (created within last 30 days)
   const isNewDress = (dress: Dress) => {
@@ -97,44 +77,143 @@ const Landing = () => {
     return diffDays <= 30;
   };
 
-
-
-
   // Fetch shops
   const fetchShops = async () => {
-    const { data, error } = await supabase.from("shops").select("*").limit(10);
+    const { data, error } = await supabase
+      .from("shops")
+      .select("id, name, location, image_url, rating, review_count")
+      .limit(10);
     if (error) return console.error(error);
     if (data) setShops(data as Shop[]);
   };
 
-  // Fetch dresses
-  const fetchDresses = async () => {
-    const { data, error } = await supabase
-      .from("dresses")
-      .select(`*, shops(name, location)`)
-      .order("created_at", { ascending: false })
-      .limit(12);
+  // Fetch dresses with proper error handling and loading states
+  const fetchDresses = useCallback(async (searchQuery?: string) => {
+    try {
+      setLoading(true);
 
-    if (error) {
-      console.error("Error fetching dresses:", error);
-      return;
-    }
+      // First, test basic connectivity with a simple query
+      debugLog("Testing basic dresses query...");
+      const { data: testData, error: testError } = await supabase
+        .from("dresses")
+        .select("id")
+        .limit(1);
 
-    if (data) {
-      const mapped: Dress[] = (data as DressWithShop[]).map((d) => ({
-        id: d.id,
-        name: d.name,
-        price: d.price,
-        size: d.size,
-        color: d.color,
-        category: d.category,
-        image_url: d.image_url || undefined,
-        shop_id: d.shop_id,
-        shop: d.shops ? { name: d.shops.name, location: d.shops.location } : undefined,
-      }));
-      setDresses(mapped);
+      if (testError) {
+        throw new Error(`Database connectivity test failed: ${testError.message}`);
+      }
+
+      debugLog("Basic query successful, proceeding with full query...");
+
+      // Build the main query
+      let query = supabase
+        .from("dresses")
+        .select(`
+          id,
+          shop_id,
+          name,
+          price,
+          stock,
+          size,
+          color,
+          category,
+          image_url,
+          description,
+          material,
+          brand,
+          created_at,
+          updated_at,
+          shops (
+            name,
+            location
+          )
+        `)
+        .order("created_at", { ascending: false });
+
+      // Apply search filter if provided
+      if (searchQuery && searchQuery.trim()) {
+        query = query.ilike('name', `%${searchQuery.trim()}%`);
+      } else {
+        // Only limit when not searching
+        query = query.limit(12);
+      }
+
+      debugLog("Executing main dresses query...", { searchQuery });
+
+      const { data, error } = await query;
+
+      if (error) {
+        logApiError("Main dresses query", error);
+        throw error;
+      }
+
+      if (data) {
+        debugLog(`Successfully fetched ${data.length} dresses`);
+
+        const mapped: Dress[] = data.map((d) => ({
+          id: d.id,
+          name: d.name,
+          price: d.price,
+          stock: d.stock,
+          size: d.size,
+          color: d.color,
+          category: d.category,
+          image_url: d.image_url,
+          description: d.description,
+          material: d.material,
+          brand: d.brand,
+          created_at: d.created_at,
+          updated_at: d.updated_at,
+          shop_id: d.shop_id,
+          shops: d.shops ? {
+            name: d.shops.name,
+            location: d.shops.location
+          } : undefined,
+        }));
+
+        setDresses(mapped);
+
+        // Show success message in development
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`✅ Successfully loaded ${mapped.length} dresses`);
+        }
+      } else {
+        debugLog("No dresses data returned");
+        setDresses([]);
+      }
+    } catch (error: unknown) {
+      logApiError("fetchDresses", error);
+
+      // Provide more specific error messages based on error type
+      let title = "Failed to load dresses";
+      let description = "Please check your connection and try again.";
+
+      if (error && typeof error === 'object' && 'code' in error) {
+        const err = error as { code?: string; message?: string };
+        if (err.code === 'PGRST116') {
+          title = "Database connection issue";
+          description = "Unable to connect to the database. Please try again later.";
+        } else if (err.code === '42P01') {
+          title = "Table not found";
+          description = "The dresses table doesn't exist. Please contact support.";
+        } else if (err.code === '42703') {
+          title = "Column error";
+          description = "There's an issue with the database schema. Please contact support.";
+        }
+      }
+
+      toast({
+        variant: "destructive",
+        title,
+        description,
+      });
+
+      // Set empty array on error to prevent UI crashes
+      setDresses([]);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [toast]);
 
   // Fetch shops with real-time updates
   useEffect(() => {
@@ -148,21 +227,28 @@ const Landing = () => {
     return () => {
       supabase.removeChannel(shopsChannel);
     };
-  }, []);
+  }, [searchQuery]);
 
   // Fetch dresses with real-time updates
   useEffect(() => {
-    fetchDresses();
+    fetchDresses(searchQuery);
     const dressesChannel = supabase
       .channel('dresses_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'dresses' }, () => {
-        fetchDresses();
+        fetchDresses(searchQuery);
       })
       .subscribe();
     return () => {
       supabase.removeChannel(dressesChannel);
     };
-  }, []);
+  }, [fetchDresses, searchQuery]);
+
+  // Fetch dresses when search query changes
+  useEffect(() => {
+    if (searchQuery) {
+      fetchDresses(searchQuery);
+    }
+  }, [searchQuery, fetchDresses]);
 
   // Filter logic
   useEffect(() => {
@@ -174,40 +260,75 @@ const Landing = () => {
       return;
     }
 
-    setFilteredShops(
-      shops.filter(
-        (shop) =>
-          shop.name.toLowerCase().includes(query) ||
-          shop.location.toLowerCase().includes(query)
-      )
+    const filteredShops = shops.filter(
+      (shop) =>
+        shop.name.toLowerCase().includes(query) ||
+        (shop.location && shop.location.toLowerCase().includes(query))
     );
 
-    setFilteredDresses(
-      dresses.filter(
-        (dress) =>
-          dress.name.toLowerCase().includes(query) ||
-          dress.size.toLowerCase().includes(query) ||
-          (dress.color && dress.color.toLowerCase().includes(query)) ||
-          (dress.category && dress.category.toLowerCase().includes(query)) ||
-          (dress.shop?.name && dress.shop.name.toLowerCase().includes(query)) ||
-          (dress.shop?.location && dress.shop.location.toLowerCase().includes(query))
-      )
+    setFilteredShops(filteredShops);
+
+    let filtered = dresses.filter(
+      (dress) =>
+        dress.name.toLowerCase().includes(query) ||
+        dress.size.toLowerCase().includes(query) ||
+        (dress.color && dress.color.toLowerCase().includes(query)) ||
+        (dress.category && dress.category.toLowerCase().includes(query)) ||
+        (dress.shops?.name && dress.shops.name.toLowerCase().includes(query)) ||
+        (dress.shops?.location && dress.shops.location.toLowerCase().includes(query))
     );
-  }, [searchQuery, shops, dresses]);
+
+    // Apply advanced filters
+    if (selectedCategories.length > 0) {
+      filtered = filtered.filter(dress => dress.category && selectedCategories.includes(dress.category));
+    }
+
+    if (selectedSizes.length > 0) {
+      filtered = filtered.filter(dress => selectedSizes.includes(dress.size));
+    }
+
+    if (selectedColors.length > 0) {
+      filtered = filtered.filter(dress => dress.color && selectedColors.includes(dress.color));
+    }
+
+    filtered = filtered.filter(dress => dress.price && dress.price >= priceRange[0] && dress.price <= priceRange[1]);
+
+    setFilteredDresses(filtered);
+  }, [searchQuery, shops, dresses, selectedCategories, selectedSizes, selectedColors, priceRange]);
 
   // Sort filtered dresses
   const sortedDresses = [...filteredDresses].sort((a, b) => {
+    const priceA = a.price || 0;
+    const priceB = b.price || 0;
+
     switch (sortOption) {
       case "price-low":
-        return a.price - b.price;
+        return priceA - priceB;
       case "price-high":
-        return b.price - a.price;
+        return priceB - priceA;
       case "newest":
-        return 0; // Already sorted by creation date from supabase
+        return (b.created_at ? new Date(b.created_at).getTime() : 0) - (a.created_at ? new Date(a.created_at).getTime() : 0);
       default:
         return 0;
     }
   });
+
+  // Pagination logic
+  const totalPages = Math.ceil(sortedDresses.length / itemsPerPage);
+  const paginatedDresses = sortedDresses.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategories, selectedSizes, selectedColors, priceRange, sortOption]);
 
   // Scroll handler
   const scroll = (ref: React.RefObject<HTMLDivElement>, direction: "left" | "right") => {
@@ -226,29 +347,14 @@ const Landing = () => {
     setSelectedDress(null);
   };
 
-
-
-  // const addToCart = (dress: Dress) => {
-  //   setCart(prevCart => {
-  //     const existingItem = prevCart.find(item => item.id === dress.id);
-  //     if (existingItem) {
-  //       return prevCart.map(item =>
-  //         item.id === dress.id
-  //           ? { ...item, quantity: item.quantity + 1 }
-  //           : item
-  //       );
-  //     } else {
-  //       return [...prevCart, { ...dress, quantity: 1 }];
-  //     }
-  //   });
-  //   toast({
-  //     title: "Added to cart!",
-  //     description: `${dress.name} has been added to your cart.`,
-  //   });
-  // };
-
   // Cart total quantity
   const totalCartQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Calculate active filters count
+  const activeFiltersCount = (selectedCategories.length > 0 ? 1 : 0) +
+                             (selectedSizes.length > 0 ? 1 : 0) +
+                             (selectedColors.length > 0 ? 1 : 0) +
+                             (priceRange[0] > 0 || priceRange[1] < 10000 ? 1 : 0);
 
   // Customer authentication check for addToCart
   const { openModal } = useAuthModal();
@@ -258,7 +364,20 @@ const Landing = () => {
       if (!data.session) {
         openModal(() => handleAddToCart(dress));
       } else {
-        addToCart(dress);
+        addToCart({
+          id: dress.id,
+          name: dress.name,
+          price: dress.price || 0,
+          size: dress.size,
+          color: dress.color || undefined,
+          category: dress.category || undefined,
+          image_url: dress.image_url || undefined,
+          shop_id: dress.shop_id,
+          shop: dress.shops ? {
+            name: dress.shops.name,
+            location: dress.shops.location || ""
+          } : undefined,
+        });
         toast({
           title: "Added to cart!",
           description: `${dress.name} has been added to your cart.`,
@@ -306,70 +425,67 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
+      <Navbar onSearch={setSearchQuery} />
 
       {/* Hero Section */}
-      <motion.section
-        className="min-h-[80vh] flex items-center justify-center relative overflow-hidden"
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true }}
-        variants={fadeIn}
-      >
-        <div
-          className="absolute inset-0 bg-cover bg-center scale-105"
-          style={{ backgroundImage: `url(${heroBoutique})` }}
-        />
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+      {!searchQuery && (
+        <motion.section
+          className="min-h-[80vh] flex items-center justify-center relative overflow-hidden"
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          variants={fadeIn}
+        >
+          <div
+            className="absolute inset-0 bg-cover bg-center scale-105"
+            style={{ backgroundImage: `url(${heroBoutique})` }}
+          />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
 
-        <div className="container mx-auto px-4 z-10 text-center">
-          <h1 className="text-5xl md:text-7xl font-playfair font-bold text-white leading-tight">
-            Instant <span className="bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">Dress Tracker</span>
-          </h1>
-          <p className="text-xl md:text-2xl text-white/90 max-w-2xl mx-auto mt-4">
-            Find your perfect dress instantly and check real-time availability in local shops.
-          </p>
-
-          <div className="max-w-2xl mx-auto mt-8 relative">
-            <Search className="absolute left-4 top-3 h-5 w-5 text-gray-400" />
-            <Input
-              type="text"
-              placeholder="Search by dress, shop, or size..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-12 h-14 bg-white/90 border-0 text-lg placeholder:text-gray-500 focus:bg-white rounded-lg shadow-md transition-all"
-            />
+          <div className="container mx-auto px-4 z-10 text-center">
+            <h1 className="text-5xl md:text-7xl font-playfair font-bold text-white leading-tight">
+              Instant <span className="bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">Dress Tracker</span>
+            </h1>
+            <p className="text-xl md:text-2xl text-white/90 max-w-2xl mx-auto mt-4">
+              Find your perfect dress instantly and check real-time availability in local shops.
+            </p>
           </div>
-
-
-        </div>
-      </motion.section>
-
-     
+        </motion.section>
+      )}
 
       {/* Search Results */}
       {searchQuery && (
-        <div className="bg-gray-50 min-h-screen py-8">
+        <div className="bg-white min-h-screen py-8">
           <div className="container mx-auto px-4">
             {/* Search Header */}
             <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Search Results for "<span className="text-primary">{searchQuery}</span>"
-              </h1>
-              <p className="text-gray-600">
-                Found {filteredDresses.length} dresses and {filteredShops.length} shops
-              </p>
+              <div className="max-w-6xl mx-auto">
+                <h1 className="text-4xl md:text-5xl font-playfair font-bold text-primary mb-6 text-center">
+                  Search Results
+                </h1>
+
+                <p className="text-muted-foreground text-center text-lg">
+                  Showing {filteredDresses.length} dresses and {filteredShops.length} shops for "{searchQuery}"
+                </p>
+              </div>
             </div>
 
             {/* Results Filter and Sort Bar */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
                 <div className="flex flex-wrap items-center gap-4">
-                  <Button variant="outline" className="flex items-center gap-2 border-gray-300 hover:bg-gray-50">
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-2 border-gray-300 hover:bg-gray-50"
+                    onClick={() => setIsFilterOpen(!isFilterOpen)}
+                  >
                     <Filter className="w-4 h-4" />
                     Filters
-                    <Badge variant="secondary" className="ml-1">0</Badge>
+                    <Badge variant="secondary" className="ml-1">{activeFiltersCount}</Badge>
                   </Button>
+
+
+
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-gray-700">View:</span>
                     <Button
@@ -442,15 +558,6 @@ const Landing = () => {
                     <div className="block cursor-pointer" onClick={() => {
                       // Temporarily force modal to open for testing
                       openModal(() => navigate(`/shop/${shop.id}`));
-                      /*
-                      supabase.auth.getSession().then(({ data }) => {
-                        if (!data.session) {
-                          openModal(() => navigate(`/shop/${shop.id}`));
-                        } else {
-                          navigate(`/shop/${shop.id}`);
-                        }
-                      });
-                      */
                     }}>
                       <div className="relative overflow-hidden rounded-t-xl">
                         <img
@@ -464,7 +571,7 @@ const Landing = () => {
                         <CardTitle className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-primary transition-colors">
                           {shop.name}
                         </CardTitle>
-                        <CardDescription className="text-sm text-gray-600 flex items-center mb-3">
+                      <CardDescription className="text-sm text-gray-600 flex items-center mb-3">
                           <MapPin className="w-4 h-4 mr-2 text-gray-400" />
                           {shop.location}
                         </CardDescription>
@@ -475,8 +582,8 @@ const Landing = () => {
                                 <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                               ))}
                             </div>
-                            <span className="text-sm font-medium text-gray-700 ml-1">4.8</span>
-                            <span className="text-sm text-gray-500">(124)</span>
+                            <span className="text-sm font-medium text-gray-700 ml-1">{shop.rating || 4.8}</span>
+                            <span className="text-sm text-gray-500">({shop.review_count || 124})</span>
                           </div>
                           <Badge variant="secondary" className="text-xs">
                             Open
@@ -505,7 +612,7 @@ const Landing = () => {
 
               {viewMode === "grid" ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                  {sortedDresses.map((dress) => (
+                  {paginatedDresses.map((dress) => (
                     <Card key={dress.id} className="group overflow-hidden border-0 shadow-md hover:shadow-xl transition-all duration-300 bg-white">
                       <div className="relative overflow-hidden">
                         <Link to={`/dress/${dress.id}`}>
@@ -531,8 +638,6 @@ const Landing = () => {
                             </Badge>
                           )}
                         </div>
-
-                        {/* Removed Wishlist Button */}
 
                         {/* Quick Actions Overlay */}
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
@@ -577,13 +682,13 @@ const Landing = () => {
                         {/* Shop Info */}
                         <p className="text-xs text-gray-600 flex items-center mb-3">
                           <MapPin className="w-3 h-3 mr-1 text-gray-400" />
-                          {dress.shop?.name}
+                          {dress.shops?.name}
                         </p>
 
                         {/* Price and Size */}
                         <div className="flex justify-between items-center">
                           <div className="flex flex-col">
-                            <span className="text-lg font-bold text-primary">₹{dress.price.toLocaleString("en-IN")}</span>
+                            <span className="text-lg font-bold text-primary">₹{(dress.price || 0).toLocaleString("en-IN")}</span>
                             {dress.color && (
                               <span className="text-xs text-gray-500">Color: {dress.color}</span>
                             )}
@@ -608,7 +713,7 @@ const Landing = () => {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {sortedDresses.map((dress) => (
+                  {paginatedDresses.map((dress) => (
                     <Card key={dress.id} className="group overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-white">
                       <div className="flex">
                         {/* Product Image */}
@@ -654,7 +759,7 @@ const Landing = () => {
                               {/* Shop Info */}
                               <p className="text-sm text-gray-600 flex items-center mb-3">
                                 <MapPin className="w-3 h-3 mr-1 text-gray-400" />
-                                {dress.shop?.name} • {dress.shop?.location}
+                                {dress.shops?.name} • {dress.shops?.location}
                               </p>
 
                               {/* Details */}
@@ -677,7 +782,7 @@ const Landing = () => {
 
                             {/* Price */}
                             <div className="text-right ml-4">
-                              <span className="text-xl font-bold text-primary">₹{dress.price.toLocaleString("en-IN")}</span>
+                              <span className="text-xl font-bold text-primary">₹{(dress.price || 0).toLocaleString("en-IN")}</span>
                             </div>
                           </div>
 
@@ -713,11 +818,56 @@ const Landing = () => {
                   ))}
                 </div>
               )}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-12">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="border-gray-300 hover:bg-gray-50"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Previous
+                  </Button>
+
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageChange(page)}
+                        className={`w-10 h-10 p-0 ${
+                          currentPage === page
+                            ? "bg-primary hover:bg-primary/90"
+                            : "border-gray-300 hover:bg-gray-50"
+                        }`}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="border-gray-300 hover:bg-gray-50"
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
           {/* No results */}
-          {filteredShops.length === 0 && filteredDresses.length === 0 && (
+          {filteredShops.length === 0 && filteredDresses.length === 0 && searchQuery && (
             <div className="text-center py-16 bg-white rounded-lg border">
               <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
                 <Search className="w-12 h-12 text-gray-400" />
@@ -821,8 +971,7 @@ const Landing = () => {
   const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
   return dateB - dateA;
 })
-
-          // Show only the top 8 new arrivals
+          // Show only the top 4 new arrivals
           .slice(0, 4)
           .map((dress) => (
             <div
@@ -836,11 +985,11 @@ const Landing = () => {
               />
               <h3 className="mt-4 font-semibold text-lg">{dress.name}</h3>
               <p className="text-sm text-gray-500">
-                {dress.shop?.name} • {dress.shop?.location}
+                {dress.shops?.name} • {dress.shops?.location}
               </p>
               <div className="flex justify-between items-center mt-2">
                 <span className="font-bold text-primary">
-                  ₹{dress.price.toLocaleString("en-IN")}
+                  ₹{(dress.price || 0).toLocaleString("en-IN")}
                 </span>
                 <Badge variant="outline">{dress.size}</Badge>
               </div>
@@ -871,17 +1020,7 @@ const Landing = () => {
                   <p className="text-sm text-gray-500">{shop.location}</p>
               <Button className="mt-4 w-full bg-gradient-to-r from-primary to-primary/80 text-white hover:from-primary/90 hover:to-primary/70"
                 onClick={() => {
-                  // Temporarily force modal to open for testing
                   openModal(() => navigate(`/shop/${shop.id}`));
-                  /*
-                  supabase.auth.getSession().then(({ data }) => {
-                    if (!data.session) {
-                      openModal(() => navigate(`/shop/${shop.id}`));
-                    } else {
-                      navigate(`/shop/${shop.id}`);
-                    }
-                  });
-                  */
                 }}
               >
                 View Shop
@@ -976,7 +1115,7 @@ const Landing = () => {
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
-                <p className="text-lg font-bold text-primary mb-4">₹{selectedDress.price.toLocaleString("en-IN")}</p>
+                <p className="text-lg font-bold text-primary mb-4">₹{(selectedDress.price || 0).toLocaleString("en-IN")}</p>
                 <div className="space-y-4 mb-6">
                   <div>
                     <span className="font-semibold">Size: </span>
@@ -994,10 +1133,10 @@ const Landing = () => {
                       <span>{selectedDress.category}</span>
                     </div>
                   )}
-                  {selectedDress.shop && (
+                  {selectedDress.shops && (
                     <div>
                       <span className="font-semibold">Available at: </span>
-                      <span>{selectedDress.shop.name} • {selectedDress.shop.location}</span>
+                      <span>{selectedDress.shops.name} • {selectedDress.shops.location}</span>
                     </div>
                   )}
                 </div>
@@ -1005,7 +1144,6 @@ const Landing = () => {
                   <Button className="flex-1 bg-gradient-to-r from-primary to-primary/80 text-white" onClick={() => handleAddToCart(selectedDress)}>
                     Add to Cart
                   </Button>
-                  {/* Removed Wishlist Button in Quick View Modal */}
                 </div>
               </div>
             </div>

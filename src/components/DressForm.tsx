@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { supabase } from "@/integrations/supabaseClient";
 import { DressFormData } from "@/pages/Dashboard";
-import { Image as ImageIcon, PlusCircle, Save } from "lucide-react";
+import { Image as ImageIcon, PlusCircle, Save, Camera } from "lucide-react";
 import { dressFormSchema } from "@/lib/validations";
 
 interface DressFormProps {
@@ -49,6 +49,9 @@ const DressForm: React.FC<DressFormProps> = ({
   });
 
   const [uploading, setUploading] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const onSubmit = async (data: DressFormData) => {
     const submitData = { ...data, shop_id: shopId };
@@ -107,6 +110,81 @@ const DressForm: React.FC<DressFormProps> = ({
     } finally {
       setUploading(false);
     }
+  };
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' } // Use back camera if available
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        setCameraActive(true);
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      alert('Unable to access camera. Please check permissions.');
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+      setCameraActive(false);
+    }
+  };
+
+  const capturePhoto = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+
+    if (!context) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0);
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+
+      setUploading(true);
+      stopCamera();
+
+      // Generate a unique file path for storage
+      const fileName = `${Math.random().toString(36).substring(2, 15)}.jpg`;
+      const filePath = `${shopId}/${fileName}`;
+
+      try {
+        const { data, error: uploadError } = await supabase.storage
+          .from("dress_images")
+          .upload(filePath, blob);
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from("dress_images")
+          .getPublicUrl(filePath);
+
+        if (!urlData?.publicUrl) {
+          throw new Error("Failed to get public URL");
+        }
+
+        setValue("image_url", urlData.publicUrl);
+      } catch (error) {
+        console.error("Error uploading captured image:", error);
+        alert("Failed to upload captured image. Please try again.");
+      } finally {
+        setUploading(false);
+      }
+    }, 'image/jpeg', 0.8);
   };
 
   return (
@@ -228,15 +306,48 @@ const DressForm: React.FC<DressFormProps> = ({
 
           {/* Full width: image upload + URL + preview */}
           <div className="md:col-span-2 space-y-2">
-            <Label htmlFor="image_upload">Upload Image</Label>
-            <input
-              id="image_upload"
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              disabled={uploading}
-              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-            />
+            <Label>Upload Image</Label>
+            <div className="flex gap-2">
+              <input
+                id="image_upload"
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                disabled={uploading}
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={cameraActive ? stopCamera : startCamera}
+                className="flex items-center gap-2"
+                disabled={uploading}
+              >
+                <Camera className="w-4 h-4" />
+                {cameraActive ? 'Stop Camera' : 'Use Camera'}
+              </Button>
+            </div>
+
+            {cameraActive && (
+              <div className="space-y-2">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-40 object-cover rounded-md border bg-black"
+                />
+                <Button
+                  type="button"
+                  onClick={capturePhoto}
+                  className="w-full bg-green-600 hover:bg-green-700"
+                  disabled={uploading}
+                >
+                  Capture Photo
+                </Button>
+              </div>
+            )}
+
             <Label htmlFor="image_url">Or enter Image URL</Label>
             <Input
               id="image_url"
@@ -245,6 +356,10 @@ const DressForm: React.FC<DressFormProps> = ({
               aria-invalid={errors.image_url ? "true" : "false"}
             />
             {errors.image_url && <p className="text-red-600 text-sm mt-1">{errors.image_url.message}</p>}
+
+            {/* Hidden canvas for photo capture */}
+            <canvas ref={canvasRef} className="hidden" />
+
             {/** Show preview if image_url exists */}
             {/** Use watch to get current image_url value */}
             {(() => {
