@@ -23,6 +23,8 @@ export const loginSchema = z.object({
 export const signupSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
+  fullName: z.string().min(1, "Full name is required").max(100, "Full name must be less than 100 characters").optional(),
+  phone: z.string().regex(/^[+]?[1-9][\d]{0,15}$/, "Please enter a valid phone number").optional().or(z.literal("")),
 });
 
 export const forgotPasswordSchema = z.object({

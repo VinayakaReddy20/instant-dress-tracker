@@ -65,6 +65,16 @@ const Auth = () => {
             {isLogin ? "Sign Up" : "Login"}
           </span>
         </p>
+        {isLogin && (
+          <p className="text-sm text-center">
+            <span
+              className="text-blue-500 cursor-pointer"
+              onClick={() => navigate("/reset-password")}
+            >
+              Forgot Password?
+            </span>
+          </p>
+        )}
       </div>
     </div>
   );

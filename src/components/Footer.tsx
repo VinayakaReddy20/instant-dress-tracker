@@ -27,49 +27,32 @@ const Footer = () => {
     "Visa", "Mastercard", "PayPal", "Apple Pay", "Google Pay"
   ];
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!feedbackText.trim() || rating === 0) {
       alert("Please provide a rating and feedback message.");
       return;
     }
 
-    const fullMessage = `
-Name: ${name || "Anonymous"}
-Email: ${email || "Not provided"}
-Category: ${category}
-Rating: ${rating} star${rating > 1 ? "s" : ""}
-Feedback: ${feedbackText.trim()}
-    `.trim();
-
-    try {
-      // Send feedback email via backend API or email service
-      // Here, we simulate sending email by calling a backend endpoint
-      const response = await fetch("/api/send-feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: "vinaysdr02@gmail.com",
-          subject: `New Feedback from DressTracker - ${category}`,
-          message: fullMessage,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to send feedback");
-      }
-
-      alert("Thank you for your feedback! We appreciate your input.");
-      setFeedbackText("");
-      setRating(0);
-      setName("");
-      setEmail("");
-      setCategory("General Feedback");
-      setShowFeedbackForm(false);
-    } catch (error) {
-      alert("Error sending feedback. Please try again later.");
-      console.error(error);
+    // Validate email if provided
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      alert("Please enter a valid email address.");
+      return;
     }
+
+    const subject = `New Feedback from DressTracker - ${category}`;
+    const body = `Name: ${name || "Anonymous"}\nEmail: ${email || "Not provided"}\nCategory: ${category}\nRating: ${rating} star${rating > 1 ? "s" : ""}\nFeedback: ${feedbackText.trim()}`;
+
+    // Open email client with pre-filled feedback
+    window.location.href = `mailto:vinaysdr02@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    alert("Thank you for your feedback! Your email client has opened with the feedback details.");
+    setFeedbackText("");
+    setRating(0);
+    setName("");
+    setEmail("");
+    setCategory("General Feedback");
+    setShowFeedbackForm(false);
   };
 
   return (
@@ -210,22 +193,22 @@ Feedback: ${feedbackText.trim()}
 
       {/* Feedback Modal */}
       {showFeedbackForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 p-6 rounded-t-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-gray-800 rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-gray-700">
+            <div className="bg-gradient-to-r from-gray-700 to-gray-600 border-b border-gray-600 p-6 rounded-t-3xl">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center">
                     <span className="text-white font-bold text-sm">DT</span>
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-gray-900">Share Your Feedback</h3>
-                    <p className="text-sm text-gray-600">Help us improve your DressTracker experience</p>
+                    <h3 className="text-xl font-bold text-white">Share Your Feedback</h3>
+                    <p className="text-sm text-gray-300">Help us improve your DressTracker experience</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowFeedbackForm(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  className="text-gray-400 hover:text-white transition-colors p-1 rounded-full hover:bg-gray-600"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -233,24 +216,24 @@ Feedback: ${feedbackText.trim()}
                 </button>
               </div>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+            <form onSubmit={handleSubmit} className="p-6 space-y-6">
               {/* Rating */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  How would you rate your experience? <span className="text-red-500">*</span>
+                <label className="block text-sm font-semibold text-gray-200 mb-4">
+                  How would you rate your experience? <span className="text-red-400">*</span>
                 </label>
-                <div className="flex space-x-2">
+                <div className="flex space-x-3">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
                       type="button"
                       onClick={() => setRating(star)}
-                      className="focus:outline-none transition-transform hover:scale-110"
+                      className="focus:outline-none focus:ring-2 focus:ring-pink-500 rounded transition-transform hover:scale-110 p-1"
                     >
                       <Star
-                        size={32}
+                        size={36}
                         className={`${
-                          star <= rating ? "text-yellow-400 fill-current" : "text-gray-300"
+                          star <= rating ? "text-yellow-400 fill-current" : "text-gray-500"
                         } hover:text-yellow-400 transition-colors`}
                       />
                     </button>
@@ -260,27 +243,27 @@ Feedback: ${feedbackText.trim()}
 
               {/* Category */}
               <div>
-                <label htmlFor="category" className="block text-sm font-semibold text-gray-700 mb-2">
+                <label htmlFor="category" className="block text-sm font-semibold text-gray-200 mb-3">
                   Feedback Category
                 </label>
                 <select
                   id="category"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-colors"
+                  className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-colors"
                 >
-                  <option>General Feedback</option>
-                  <option>Product Quality</option>
-                  <option>Customer Service</option>
-                  <option>Website Usability</option>
-                  <option>Order & Delivery</option>
-                  <option>Other</option>
+                  <option className="bg-gray-700">General Feedback</option>
+                  <option className="bg-gray-700">Product Quality</option>
+                  <option className="bg-gray-700">Customer Service</option>
+                  <option className="bg-gray-700">Website Usability</option>
+                  <option className="bg-gray-700">Order & Delivery</option>
+                  <option className="bg-gray-700">Other</option>
                 </select>
               </div>
 
               {/* Name */}
               <div>
-                <label htmlFor="name" className="block text-sm font-semibold text-gray-700 mb-2">
+                <label htmlFor="name" className="block text-sm font-semibold text-gray-200 mb-3">
                   Name (Optional)
                 </label>
                 <input
@@ -288,14 +271,14 @@ Feedback: ${feedbackText.trim()}
                   id="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-colors"
+                  className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-colors placeholder-gray-400"
                   placeholder="Your name"
                 />
               </div>
 
               {/* Email */}
               <div>
-                <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
+                <label htmlFor="email" className="block text-sm font-semibold text-gray-200 mb-3">
                   Email (Optional)
                 </label>
                 <input
@@ -303,19 +286,19 @@ Feedback: ${feedbackText.trim()}
                   id="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-colors"
+                  className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-colors placeholder-gray-400"
                   placeholder="your.email@example.com"
                 />
               </div>
 
               {/* Feedback Text */}
               <div>
-                <label htmlFor="feedback" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Your Feedback <span className="text-red-500">*</span>
+                <label htmlFor="feedback" className="block text-sm font-semibold text-gray-200 mb-3">
+                  Your Feedback <span className="text-red-400">*</span>
                 </label>
                 <textarea
                   id="feedback"
-                  className="w-full border border-gray-300 rounded-lg p-4 focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none transition-colors"
+                  className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg p-4 focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none transition-colors placeholder-gray-400"
                   rows={4}
                   placeholder="Tell us about your experience, suggestions, or any issues you encountered..."
                   value={feedbackText}
@@ -325,17 +308,17 @@ Feedback: ${feedbackText.trim()}
               </div>
 
               {/* Buttons */}
-              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+              <div className="flex justify-end space-x-4 pt-6 border-t border-gray-600">
                 <button
                   type="button"
-                  className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                  className="px-6 py-3 bg-gray-600 text-gray-200 rounded-lg hover:bg-gray-500 transition-colors font-medium"
                   onClick={() => setShowFeedbackForm(false)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all font-medium flex items-center shadow-lg"
+                  className="px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all font-medium flex items-center shadow-lg hover:shadow-xl"
                 >
                   <Send className="mr-2" size={18} />
                   Send Feedback

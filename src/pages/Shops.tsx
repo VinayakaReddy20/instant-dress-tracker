@@ -7,16 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/integrations/supabaseClient";
-import type { Database } from "@/types/database.types";
 import { useAuthModal } from "@/contexts/AuthModalContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-
-// Supabase types
-type ShopRow = Database["public"]["Tables"]["shops"]["Row"];
-
-interface ShopWithCount extends ShopRow {
-  dress_count: number;
-}
+import type { ShopWithCount } from "@/types/shared";
 
 const Shops = () => {
   const navigate = useNavigate();
@@ -27,6 +20,7 @@ const Shops = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSpecialty, setSelectedSpecialty] = useState("");
+
 
   // Fetch shops with dress counts in one query
   // Fetch shops with dress counts in one query
@@ -52,7 +46,7 @@ const Shops = () => {
       }
 
       // Explicit type: each row = ShopRow + dresses: { count: number }[]
-      type ShopQueryResult = ShopRow & { dresses: { count: number }[] };
+      type ShopQueryResult = import("@/types/shared").ShopRow & { dresses: { count: number }[] };
 
       const transformed: ShopWithCount[] = (data as ShopQueryResult[]).map(
         (shop) => ({
@@ -132,8 +126,8 @@ const Shops = () => {
           </div>
 
           {/* Search and filter controls */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 space-y-4 md:space-y-0">
-            <div className="flex items-center space-x-2 w-full md:w-1/2">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8 space-y-4 lg:space-y-0">
+            <div className="flex items-center space-x-2 w-full lg:w-1/3">
               <Search className="w-5 h-5 text-muted-foreground" />
               <Input
                 type="text"
@@ -143,29 +137,32 @@ const Shops = () => {
                 className="w-full"
               />
             </div>
-            <div className="w-full md:w-1/3">
-              <Select
-                onValueChange={(value) => setSelectedSpecialty(value)}
-                value={selectedSpecialty}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Filter by specialty" />
-                </SelectTrigger>
-                <SelectContent>
-                  {/* Fix: Use null for empty value and handle null in onValueChange */}
-                  <SelectItem value={null as unknown as string}>All Specialties</SelectItem>
-                  {/* Collect unique specialties from shops */}
-                  {[...new Set(shops.flatMap((shop) => shop.specialties || []))].map(
-                    (specialty) => (
-                      <SelectItem key={specialty} value={specialty}>
-                        {specialty}
-                      </SelectItem>
-                    )
-                  )}
-                </SelectContent>
-              </Select>
+
+            <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-2/3">
+              <div className="w-full">
+                <Select
+                  onValueChange={(value) => setSelectedSpecialty(value)}
+                  value={selectedSpecialty}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Filter by specialty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={null as unknown as string}>All Specialties</SelectItem>
+                    {[...new Set(shops.flatMap((shop) => shop.specialties || []))].map(
+                      (specialty) => (
+                        <SelectItem key={specialty} value={specialty}>
+                          {specialty}
+                        </SelectItem>
+                      )
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
+
+
 
           {loading ? (
             <div className="text-center py-12">
@@ -180,13 +177,25 @@ const Shops = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {shops
                 .filter((shop) =>
-                  shop.name.toLowerCase().includes(searchQuery.toLowerCase())
+                  shop.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (shop.location?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+                  (shop.address?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+                  shop.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  shop.specialties?.some(specialty => specialty.toLowerCase().includes(searchQuery.toLowerCase()))
                 )
                 .filter((shop) =>
                   selectedSpecialty
                     ? shop.specialties?.includes(selectedSpecialty)
                     : true
                 )
+                .filter((shop) => {
+                  // Distance filtering removed - latitude/longitude no longer available
+                  return true;
+                })
+                .sort((a, b) => {
+                  // Distance sorting removed - latitude/longitude no longer available
+                  return 0;
+                })
                 .map((shop) => (
                   <div
                     key={shop.id}

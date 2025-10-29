@@ -1,12 +1,26 @@
 // src/hooks/useShops.ts
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabaseClient";
-import { Tables } from "@/types/database.types";
+import { Tables } from "@/integrations/supabase/types";
+import { calculateDistance } from "@/lib/geolocation";
 
 export type Shop = Tables<'shops'>;
 
-export const useShops = () => {
+export interface LocationFilter {
+  latitude: number;
+  longitude: number;
+  maxDistance: number; // in kilometers
+}
+
+export interface ShopFilters {
+  searchQuery?: string;
+  specialty?: string;
+  location?: LocationFilter;
+}
+
+export const useShops = (filters?: ShopFilters) => {
   const [shops, setShops] = useState<Shop[]>([]);
+  const [filteredShops, setFilteredShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,6 +44,54 @@ export const useShops = () => {
       setLoading(false);
     }
   }, []);
+
+  // Apply filters to shops
+  useEffect(() => {
+    let filtered = [...shops];
+
+    // Apply search filter
+    if (filters?.searchQuery) {
+      const query = filters.searchQuery.toLowerCase();
+      filtered = filtered.filter(shop =>
+        shop.name.toLowerCase().includes(query) ||
+        shop.location.toLowerCase().includes(query) ||
+        shop.address.toLowerCase().includes(query) ||
+        shop.description?.toLowerCase().includes(query) ||
+        shop.specialties?.some(specialty => specialty.toLowerCase().includes(query))
+      );
+    }
+
+    // Apply specialty filter
+    if (filters?.specialty) {
+      filtered = filtered.filter(shop =>
+        shop.specialties?.includes(filters.specialty!)
+      );
+    }
+
+    // Apply location filter
+    if (filters?.location) {
+      const { latitude, longitude, maxDistance } = filters.location;
+      filtered = filtered
+        .filter(shop => {
+          if (!shop.latitude || !shop.longitude) return false;
+          const distance = calculateDistance(
+            latitude,
+            longitude,
+            shop.latitude,
+            shop.longitude
+          );
+          return distance <= maxDistance;
+        })
+        .sort((a, b) => {
+          if (!a.latitude || !a.longitude || !b.latitude || !b.longitude) return 0;
+          const distA = calculateDistance(latitude, longitude, a.latitude, a.longitude);
+          const distB = calculateDistance(latitude, longitude, b.latitude, b.longitude);
+          return distA - distB; // Sort by distance (closest first)
+        });
+    }
+
+    setFilteredShops(filtered);
+  }, [shops, filters]);
 
   useEffect(() => {
     fetchShops();
@@ -76,7 +138,8 @@ export const useShops = () => {
   }, [fetchShops]);
 
   return {
-    shops,
+    shops: filteredShops,
+    allShops: shops,
     loading,
     error,
     refresh: fetchShops,

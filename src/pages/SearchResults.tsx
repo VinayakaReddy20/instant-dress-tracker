@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Search, Filter, MapPin, Package, Eye, Heart, Star, Phone, Clock } from "lucide-react";
+import { Search, Filter, MapPin, Package, Eye, Heart, Star, Phone, Clock, Navigation, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,6 +11,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import Navbar from "@/components/Navbar";
 import { searchSchema, type SearchFormData } from "@/lib/validations";
+import { useShops, type ShopFilters } from "@/hooks/useShops";
+
+import { supabase } from "@/integrations/supabaseClient";
+import { useAuthModal } from "@/contexts/AuthModalContext";
+import { useNavigate } from "react-router-dom";
 
 // Mock data - same as in Dresses and Shops pages
 const mockDresses = [
@@ -122,6 +127,16 @@ const mockShops = [
 const SearchResults = () => {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState("all");
+  const [selectedDistance, setSelectedDistance] = useState("");
+  const navigate = useNavigate();
+  const { openModal } = useAuthModal();
+
+  // Geolocation variables (removed hook)
+  const location = null;
+  const locationLoading = false;
+  const locationError = null;
+  const requestLocation = () => {};
+  const clearLocation = () => {};
 
   const form = useForm<SearchFormData>({
     resolver: zodResolver(searchSchema),
@@ -139,7 +154,15 @@ const SearchResults = () => {
     }
   }, [searchParams, form]);
 
-  // Filter dresses based on search query
+  // Build shop filters
+  const shopFilters: ShopFilters = {
+    searchQuery: searchQuery || undefined,
+  };
+
+  // Use real shop data
+  const { shops: realShops, loading: shopsLoading } = useShops(shopFilters);
+
+  // Filter dresses based on search query (keeping mock data for now)
   const filteredDresses = mockDresses.filter(dress => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
@@ -149,15 +172,8 @@ const SearchResults = () => {
            dress.category.toLowerCase().includes(query);
   });
 
-  // Filter shops based on search query
-  const filteredShops = mockShops.filter(shop => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return shop.name.toLowerCase().includes(query) ||
-           shop.location.toLowerCase().includes(query) ||
-           shop.description.toLowerCase().includes(query) ||
-           shop.specialties.some(specialty => specialty.toLowerCase().includes(query));
-  });
+  // Use real shop data instead of mock
+  const filteredShops = realShops;
 
   const totalResults = filteredDresses.length + filteredShops.length;
 
@@ -166,37 +182,72 @@ const SearchResults = () => {
       <Navbar />
       
       {/* Search Header */}
-      <section className="bg-muted/50 py-8">
+      <section className="bg-muted/50 py-4">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-3xl md:text-4xl font-playfair font-bold text-primary mb-6 text-center">
+          <div className="max-w-5xl mx-auto">
+            <h1 className="text-3xl md:text-4xl font-playfair font-bold text-primary mb-4 text-center">
               Search Results
             </h1>
-            
-            {/* Search Bar */}
-            <div className="mb-6">
-              <Form {...form}>
-                <FormField
-                  control={form.control}
-                  name="query"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="relative">
-                        <Search className="absolute left-4 top-4 h-5 w-5 text-muted-foreground" />
-                        <FormControl>
-                          <Input
-                            type="text"
-                            placeholder="Search dresses, shops, styles..."
-                            className="input-premium pl-12 h-12 text-lg"
-                            {...field}
-                          />
-                        </FormControl>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
+
+            {/* Filters */}
+            <div className="mb-4 space-y-4">
+              {/* Location filters for shops */}
+              <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
+                <div className="w-full sm:w-auto">
+                  <Select
+                    onValueChange={(value) => setSelectedDistance(value)}
+                    value={selectedDistance}
+                  >
+                    <SelectTrigger className="w-full sm:w-48">
+                      <SelectValue placeholder="Distance" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={null as unknown as string}>All Distances</SelectItem>
+                      <SelectItem value="1">Within 1 km</SelectItem>
+                      <SelectItem value="5">Within 5 km</SelectItem>
+                      <SelectItem value="10">Within 10 km</SelectItem>
+                      <SelectItem value="25">Within 25 km</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  {!location && !locationLoading && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={requestLocation}
+                      disabled={locationLoading}
+                    >
+                      <Navigation className="w-4 h-4 mr-2" />
+                      Use my location
+                    </Button>
                   )}
-                />
-              </Form>
+
+                  {locationLoading && (
+                    <div className="flex items-center space-x-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="text-sm text-muted-foreground">Getting location...</span>
+                    </div>
+                  )}
+
+                  {location && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearLocation}
+                    >
+                      Clear location
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {locationError && (
+                <p className="text-sm text-destructive text-center">
+                  {locationError}
+                </p>
+              )}
             </div>
 
             {searchQuery && (
@@ -209,7 +260,7 @@ const SearchResults = () => {
       </section>
 
       {/* Results Section */}
-      <section className="py-12">
+      <section className="py-6">
         <div className="container mx-auto px-4">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3 max-w-md mx-auto mb-8">
@@ -313,7 +364,7 @@ const SearchResults = () => {
                       >
                         <div className="relative">
                           <img
-                            src={shop.image}
+                            src={shop.image_url || "/api/placeholder/400/300"}
                             alt={shop.name}
                             className="w-full h-48 object-cover"
                           />
@@ -351,22 +402,22 @@ const SearchResults = () => {
                           </div>
                           
                           <div className="flex flex-wrap gap-2">
-                            {shop.specialties.map((specialty, idx) => (
+                            {shop.specialties?.map((specialty, idx) => (
                               <Badge key={idx} variant="secondary" className="text-xs">
                                 {specialty}
                               </Badge>
                             ))}
                           </div>
-                          
+
                           <div className="flex items-center justify-between pt-4 border-t border-border">
                             <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                               <div className="flex items-center">
                                 <Package className="w-4 h-4 mr-1" />
-                                {shop.dressCount} dresses
+                                0 dresses
                               </div>
                               <div className="flex items-center">
                                 <Star className="w-4 h-4 mr-1" />
-                                {shop.reviewCount} reviews
+                                {shop.review_count || 0} reviews
                               </div>
                             </div>
                           </div>
@@ -455,7 +506,7 @@ const SearchResults = () => {
                     
                     <div className="relative">
                       <img
-                        src={shop.image}
+                        src={shop.image_url || "/api/placeholder/400/300"}
                         alt={shop.name}
                         className="w-full h-48 object-cover"
                       />
@@ -464,7 +515,7 @@ const SearchResults = () => {
                         <span className="text-sm font-semibold">{shop.rating}</span>
                       </div>
                     </div>
-                    
+
                     <div className="p-6 space-y-4">
                       <div>
                         <h3 className="text-xl font-playfair font-semibold text-primary mb-2">
@@ -474,45 +525,45 @@ const SearchResults = () => {
                           {shop.description}
                         </p>
                       </div>
-                      
+
                       <div className="space-y-2">
                         <div className="flex items-center text-sm text-muted-foreground">
                           <MapPin className="w-4 h-4 mr-2 flex-shrink-0" />
                           {shop.location}
                         </div>
-                        
+
                         <div className="flex items-center text-sm text-muted-foreground">
                           <Phone className="w-4 h-4 mr-2 flex-shrink-0" />
                           {shop.phone}
                         </div>
-                        
+
                         <div className="flex items-center text-sm text-muted-foreground">
                           <Clock className="w-4 h-4 mr-2 flex-shrink-0" />
                           {shop.hours}
                         </div>
                       </div>
-                      
+
                       <div className="flex flex-wrap gap-2">
-                        {shop.specialties.map((specialty, idx) => (
+                        {shop.specialties?.map((specialty, idx) => (
                           <Badge key={idx} variant="secondary" className="text-xs">
                             {specialty}
                           </Badge>
                         ))}
                       </div>
-                      
+
                       <div className="flex items-center justify-between pt-4 border-t border-border">
                         <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                           <div className="flex items-center">
                             <Package className="w-4 h-4 mr-1" />
-                            {shop.dressCount} dresses
+                            0 dresses
                           </div>
                           <div className="flex items-center">
                             <Star className="w-4 h-4 mr-1" />
-                            {shop.reviewCount} reviews
+                            {shop.review_count || 0} reviews
                           </div>
                         </div>
                       </div>
-                      
+
                       <Button className="w-full btn-hero">
                         Visit Shop
                       </Button>

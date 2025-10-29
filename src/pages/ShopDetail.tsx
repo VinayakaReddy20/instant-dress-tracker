@@ -14,7 +14,7 @@ import { useToast } from "@/components/ui/use-toast";
 interface Shop {
   id: string;
   name: string;
-  address: string;
+  address?: string;
   location: string;
   phone?: string;
   hours?: string;

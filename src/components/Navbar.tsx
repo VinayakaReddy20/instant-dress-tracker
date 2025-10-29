@@ -12,9 +12,10 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 interface NavbarProps {
   onLogin?: () => void; // ✅ allow Dashboard to pass fetchDashboard
+  onSearch?: (query: string) => void; // Optional search handler for Landing page
 }
 
-const Navbar: React.FC<NavbarProps> = ({ onLogin }) => {
+const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -54,6 +55,17 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin }) => {
 
             {/* Desktop Menu */}
             <div className="hidden md:flex items-center space-x-4">
+              {onSearch && (
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search dresses, shops, styles..."
+                    className="pl-12 pr-4 py-3 w-80 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-base"
+                    onChange={(e) => onSearch(e.target.value)}
+                  />
+                </div>
+              )}
               <Link
                 to="/shops"
                 className={`px-3 py-2 rounded-md text-sm font-medium ${
