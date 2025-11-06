@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { MapPin, Phone, Clock, Star, Package, ShoppingCart } from "lucide-react";
 import { supabase } from "@/integrations/supabaseClient";
+import { Tables } from "@/integrations/supabase/types";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -10,31 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/contexts/CartContext";
 import { useAuthModal } from "@/contexts/AuthModalContext";
 import { useToast } from "@/components/ui/use-toast";
+import Map from "@/components/Map";
 
-interface Shop {
-  id: string;
-  name: string;
-  address?: string;
-  location: string;
-  phone?: string;
-  hours?: string;
-  rating?: number;
-  review_count?: number;
-  specialties?: string[];
-  description?: string;
-  image_url?: string;
-}
-
-interface Dress {
-  id: string;
-  name: string;
-  price: number;
-  size: string;
-  color?: string;
-  category?: string;
-  image_url?: string;
-  stock?: number;
-}
+type Shop = Tables<'shops'>;
+type Dress = Tables<'dresses'>;
 
 const ShopDetail = () => {
   const { shopId } = useParams<{ shopId: string }>();
@@ -63,7 +43,7 @@ const ShopDetail = () => {
           .single();
 
         if (shopError) throw shopError;
-        setShop(shopData as Shop);
+        setShop(shopData);
 
         // Get dresses for this shop
         const { data: dressData, error: dressError } = await supabase
@@ -73,7 +53,7 @@ const ShopDetail = () => {
           .order("created_at", { ascending: false });
 
         if (dressError) throw dressError;
-        setDresses(dressData as Dress[]);
+        setDresses(dressData);
       } catch (err) {
         console.error("Error fetching shop details:", err);
       } finally {
@@ -127,10 +107,24 @@ const ShopDetail = () => {
 
           <div className="grid md:grid-cols-2 gap-6">
             <div className="space-y-2 text-gray-600">
-              <p className="flex items-center">
-                <MapPin className="w-4 h-4 mr-2 text-primary" />
-                {shop.address}
-              </p>
+              {shop.business_name && shop.business_name !== shop.name && (
+                <p className="flex items-center">
+                  <span className="font-semibold mr-2">Business Name:</span>
+                  {shop.business_name}
+                </p>
+              )}
+              {shop.full_name && (
+                <p className="flex items-center">
+                  <span className="font-semibold mr-2">Owner:</span>
+                  {shop.full_name}
+                </p>
+              )}
+              {shop.address && (
+                <p className="flex items-center">
+                  <MapPin className="w-4 h-4 mr-2 text-primary" />
+                  {shop.address}
+                </p>
+              )}
               {shop.phone && (
                 <p className="flex items-center">
                   <Phone className="w-4 h-4 mr-2 text-primary" />
@@ -156,6 +150,18 @@ const ShopDetail = () => {
                 <Package className="w-4 h-4 mr-2 text-primary" />
                 {dresses.length} dresses available
               </p>
+              {shop.created_at && (
+                <p className="flex items-center">
+                  <span className="font-semibold mr-2">Created:</span>
+                  {new Date(shop.created_at).toLocaleDateString()}
+                </p>
+              )}
+              {shop.updated_at && (
+                <p className="flex items-center">
+                  <span className="font-semibold mr-2">Updated:</span>
+                  {new Date(shop.updated_at).toLocaleDateString()}
+                </p>
+              )}
             </div>
           </div>
 
@@ -169,6 +175,19 @@ const ShopDetail = () => {
             </div>
           )}
         </div>
+
+        {/* Map Section */}
+        {shop.latitude && shop.longitude && (
+          <div className="mt-8">
+            <h2 className="text-2xl font-playfair font-semibold text-primary mb-4">
+              Location
+            </h2>
+            <Map
+              shops={[shop]}
+              height="300px"
+            />
+          </div>
+        )}
       </div>
 
       {/* Dresses in this Shop */}
@@ -191,50 +210,31 @@ const ShopDetail = () => {
                 <div className="p-4 space-y-2">
                   <h3 className="font-semibold text-lg">{dress.name}</h3>
                   <p className="text-sm text-gray-500">
-                    {dress.category} {dress.color && `• ${dress.color}`}
+                    {dress.category && `Category: ${dress.category}`} {dress.color && `• Color: ${dress.color}`} {dress.brand && `• Brand: ${dress.brand}`} {dress.material && `• Material: ${dress.material}`}
                   </p>
                   <div className="flex justify-between items-center mt-2">
                     <span className="font-bold text-primary">
-                      ₹{dress.price.toLocaleString("en-IN")}
+                      ₹{dress.price ? dress.price.toLocaleString("en-IN") : "N/A"}
                     </span>
-                    <Badge variant="outline">{dress.size}</Badge>
+                    <div className="flex gap-2">
+                      <Badge variant="outline">{dress.size}</Badge>
+                      {dress.stock && <Badge variant="secondary">Stock: {dress.stock}</Badge>}
+                    </div>
                   </div>
                   <div className="flex gap-2 mt-3">
                     <Button
                       className="flex-1 bg-gradient-to-r from-primary to-primary/80 text-white hover:from-primary/90 hover:to-primary/70"
                       onClick={() => {
-                        supabase.auth.getSession().then(({ data }) => {
-                          if (!data.session) {
-                            openModal(() => {
-                              addToCart({
-                                id: dress.id,
-                                name: dress.name,
-                                price: dress.price,
-                                size: dress.size,
-                                color: dress.color,
-                                category: dress.category,
-                                image_url: dress.image_url,
-                                shop_id: shopId!,
-                                shop: { name: shop.name, location: shop.location }
-                              });
-                            });
-                          } else {
-                            addToCart({
-                              id: dress.id,
-                              name: dress.name,
-                              price: dress.price,
-                              size: dress.size,
-                              color: dress.color,
-                              category: dress.category,
-                              image_url: dress.image_url,
-                              shop_id: shopId!,
-                              shop: { name: shop.name, location: shop.location }
-                            });
-                            toast({
-                              title: "Added to cart!",
-                              description: `${dress.name} has been added to your cart.`,
-                            });
-                          }
+                        addToCart({
+                          id: dress.id,
+                          name: dress.name,
+                          price: dress.price,
+                          size: dress.size,
+                          color: dress.color,
+                          category: dress.category,
+                          image_url: dress.image_url,
+                          shop_id: shopId!,
+                          shop: { name: shop.name, location: shop.location || "" }
                         });
                       }}
                     >

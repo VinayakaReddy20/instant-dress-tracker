@@ -11,6 +11,8 @@ export interface Dress extends DressRow {
 
 export interface ShopWithCount extends ShopRow {
   dress_count: number;
+  latitude?: number;
+  longitude?: number;
 }
 
 // Re-export Database type for convenience
