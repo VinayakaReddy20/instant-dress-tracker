@@ -121,6 +121,12 @@ export const shopFormSchema = z.object({
     .url("Please enter a valid URL")
     .optional()
     .or(z.literal("")),
+  latitude: z
+    .number()
+    .optional(),
+  longitude: z
+    .number()
+    .optional(),
 });
 
 // Search validation schema

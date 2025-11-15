@@ -8,12 +8,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { supabase } from "@/integrations/supabaseClient";
 import { shopFormSchema, type ShopFormData as ValidatedShopFormData } from "@/lib/validations";
+import { getCurrentLocation, reverseGeocode } from "@/lib/geolocation";
+import Map from "@/components/Map";
+import { validateAddress } from "@/lib/googleMaps";
 
 import type { Database } from "@/types/shared";
-import { Loader2, MapPin, Camera, Map } from "lucide-react";
+import { Loader2, MapPin, Camera, Navigation, CheckCircle, XCircle } from "lucide-react";
 
 interface ShopEditFormProps {
-  initialData: ValidatedShopFormData & { id: string };
+  initialData: ValidatedShopFormData & { id: string; latitude?: number; longitude?: number };
   onSave: () => void;
   onCancel: () => void;
 }
@@ -36,8 +39,11 @@ const ShopEditForm: React.FC<ShopEditFormProps> = ({ initialData, onSave, onCanc
   });
 
   const [uploading, setUploading] = useState(false);
-
   const [cameraActive, setCameraActive] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [addressValidating, setAddressValidating] = useState(false);
+  const [addressValid, setAddressValid] = useState<boolean | null>(null);
+
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -82,13 +88,48 @@ const ShopEditForm: React.FC<ShopEditFormProps> = ({ initialData, onSave, onCanc
   };
 
   const handleAddressChange = async (address: string) => {
-    // Address validation can be done here if needed
-    // Since geocoding is removed, no further action required
+    if (address.length > 5) {
+      setAddressValidating(true);
+      try {
+        const isValid = await validateAddress(address);
+        setAddressValid(isValid);
+      } catch (error) {
+        console.error('Address validation error:', error);
+        setAddressValid(null);
+      } finally {
+        setAddressValidating(false);
+      }
+    } else {
+      setAddressValid(null);
+    }
   };
 
   const handleUseCurrentLocation = async () => {
-    // Geolocation feature removed
-    alert('Location feature is not available.');
+    setLocationLoading(true);
+    try {
+      const location = await getCurrentLocation();
+      if (location) {
+        // Get the address from coordinates using reverse geocoding
+        const address = await reverseGeocode(location.latitude, location.longitude);
+
+        // Update form state with coordinates and address
+        form.setValue("latitude", location.latitude);
+        form.setValue("longitude", location.longitude);
+        if (address) {
+          form.setValue("address", address);
+          setAddressValid(true); // GPS addresses are typically valid
+        }
+
+        alert('Location captured successfully! Click "Update Details" to save.');
+      } else {
+        alert('Unable to get your location. Please check your browser permissions.');
+      }
+    } catch (error) {
+      console.error('Error updating location:', error);
+      alert('Failed to update location. Please try again.');
+    } finally {
+      setLocationLoading(false);
+    }
   };
 
   const startCamera = async () => {
@@ -178,6 +219,9 @@ const ShopEditForm: React.FC<ShopEditFormProps> = ({ initialData, onSave, onCanc
         specialties: data.specialties || null,
         description: data.description || null,
         image_url: data.image_url || null,
+        // Include coordinates if they were updated
+        ...(data.latitude && { latitude: data.latitude }),
+        ...(data.longitude && { longitude: data.longitude }),
       };
 
       const { error } = await supabase
@@ -301,7 +345,15 @@ const ShopEditForm: React.FC<ShopEditFormProps> = ({ initialData, onSave, onCanc
                   <FormItem>
                     <FormLabel className="flex items-center gap-2">
                       Address
-                      {field.value && <MapPin className="w-4 h-4 text-green-500" />}
+                      {addressValidating ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                      ) : addressValid === true ? (
+                        <CheckCircle className="w-4 h-4 text-green-500" />
+                      ) : addressValid === false ? (
+                        <XCircle className="w-4 h-4 text-red-500" />
+                      ) : field.value ? (
+                        <MapPin className="w-4 h-4 text-green-500" />
+                      ) : null}
                     </FormLabel>
                     <FormControl>
                       <div className="space-y-2">
@@ -318,10 +370,19 @@ const ShopEditForm: React.FC<ShopEditFormProps> = ({ initialData, onSave, onCanc
                           variant="outline"
                           onClick={handleUseCurrentLocation}
                           className="flex items-center gap-2 w-full"
-                          disabled={true}
+                          disabled={locationLoading}
                         >
-                          <Map className="w-4 h-4" />
-                          Location Feature Unavailable
+                          {locationLoading ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Getting Location...
+                            </>
+                          ) : (
+                            <>
+                              <Navigation className="w-4 h-4" />
+                              Use Current Location
+                            </>
+                          )}
                         </Button>
                       </div>
                     </FormControl>
@@ -329,6 +390,8 @@ const ShopEditForm: React.FC<ShopEditFormProps> = ({ initialData, onSave, onCanc
                   </FormItem>
                 )}
               />
+
+
 
               <FormField
                 control={form.control}
@@ -349,6 +412,23 @@ const ShopEditForm: React.FC<ShopEditFormProps> = ({ initialData, onSave, onCanc
                   </FormItem>
                 )}
               />
+
+              {/* Location Map */}
+              {initialData.latitude && initialData.longitude && (
+                <div className="space-y-2">
+                  <Label>Shop Location</Label>
+                  <div className="h-48 rounded-md overflow-hidden">
+                    <Map
+                      shops={[{ id: initialData.id, name: initialData.name, latitude: initialData.latitude!, longitude: initialData.longitude!, address: initialData.address }]}
+                      center={[initialData.latitude!, initialData.longitude!]}
+                      zoom={15}
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Coordinates: {initialData.latitude.toFixed(6)}, {initialData.longitude.toFixed(6)}
+                  </p>
+                </div>
+              )}
 
               {/* Shop image upload + URL + preview */}
               <div className="space-y-2">
@@ -463,7 +543,7 @@ const ShopEditForm: React.FC<ShopEditFormProps> = ({ initialData, onSave, onCanc
             Cancel
           </Button>
           <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={uploading}>
-            Update Shop
+            Update Details
           </Button>
         </div>
       </form>

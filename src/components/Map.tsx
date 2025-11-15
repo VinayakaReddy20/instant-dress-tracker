@@ -16,8 +16,17 @@ import { Tables } from "@/integrations/supabase/types";
 
 type Shop = Tables<'shops'>;
 
+interface ShopMarker {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  address?: string;
+  location?: string;
+}
+
 interface MapProps {
-  shops: Shop[];
+  shops: Shop[] | ShopMarker[];
   center?: [number, number];
   zoom?: number;
   height?: string;

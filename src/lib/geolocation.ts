@@ -43,3 +43,32 @@ export async function getCurrentLocation(): Promise<{ latitude: number; longitud
     );
   });
 }
+
+export async function reverseGeocode(latitude: number, longitude: number): Promise<string | null> {
+  try {
+    // Using Nominatim (OpenStreetMap) for free reverse geocoding
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+      {
+        headers: {
+          'User-Agent': 'InstantDressTracker/1.0'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Reverse geocoding failed');
+    }
+
+    const data = await response.json();
+
+    if (data && data.display_name) {
+      return data.display_name;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error reverse geocoding:', error);
+    return null;
+  }
+}

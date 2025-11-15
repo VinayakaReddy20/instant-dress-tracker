@@ -1,7 +1,7 @@
 // src/pages/ShopDetail.tsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { MapPin, Phone, Clock, Star, Package, ShoppingCart } from "lucide-react";
+import { MapPin, Phone, Clock, Star, Package, ShoppingCart, Navigation, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabaseClient";
 import { Tables } from "@/integrations/supabase/types";
 import Navbar from "@/components/Navbar";
@@ -12,6 +12,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useAuthModal } from "@/contexts/AuthModalContext";
 import { useToast } from "@/components/ui/use-toast";
 import Map from "@/components/Map";
+import { getCurrentLocation, reverseGeocode } from "@/lib/geolocation";
 
 type Shop = Tables<'shops'>;
 type Dress = Tables<'dresses'>;
@@ -26,6 +27,7 @@ const ShopDetail = () => {
   const [shop, setShop] = useState<Shop | null>(null);
   const [dresses, setDresses] = useState<Dress[]>([]);
   const [loading, setLoading] = useState(true);
+  const [locationLoading, setLocationLoading] = useState(false);
 
   // Fetch shop + dresses
   useEffect(() => {
@@ -186,6 +188,62 @@ const ShopDetail = () => {
               shops={[shop]}
               height="300px"
             />
+            <div className="mt-4 flex justify-center">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  setLocationLoading(true);
+                  try {
+                    const location = await getCurrentLocation();
+                    if (location && shop.latitude && shop.longitude) {
+                      const shopLat = shop.latitude;
+                      const shopLng = shop.longitude;
+                      const userLat = location.latitude;
+                      const userLng = location.longitude;
+
+                      // Open Google Maps with directions
+                      const url = `https://www.google.com/maps/dir/${userLat},${userLng}/${shopLat},${shopLng}`;
+                      window.open(url, '_blank');
+
+                      toast({
+                        title: "Opening directions",
+                        description: "Google Maps will open with directions to this shop.",
+                      });
+                    } else {
+                      toast({
+                        title: "Location error",
+                        description: "Unable to get your location. Please check your browser permissions.",
+                        variant: "destructive",
+                      });
+                    }
+                  } catch (error) {
+                    console.error('Error getting location:', error);
+                    toast({
+                      title: "Location error",
+                      description: "Failed to get your location. Please try again.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setLocationLoading(false);
+                  }
+                }}
+                className="flex items-center gap-2"
+                disabled={locationLoading}
+              >
+                {locationLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Getting Location...
+                  </>
+                ) : (
+                  <>
+                    <Navigation className="w-4 h-4" />
+                    Use Current Location
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         )}
       </div>
