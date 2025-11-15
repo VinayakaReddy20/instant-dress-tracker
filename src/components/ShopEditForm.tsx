@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -10,11 +10,10 @@ import { supabase } from "@/integrations/supabaseClient";
 import { shopFormSchema, type ShopFormData as ValidatedShopFormData } from "@/lib/validations";
 import { getCurrentLocation, reverseGeocode } from "@/lib/geolocation";
 import Map from "@/components/Map";
-import AutoCompleteInput from "@/components/AutoCompleteInput";
 import { validateAddress } from "@/lib/googleMaps";
 
 import type { Database } from "@/types/shared";
-import { Loader2, MapPin, Camera, Map as MapIcon, Navigation, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, MapPin, Camera, Navigation, CheckCircle, XCircle } from "lucide-react";
 
 interface ShopEditFormProps {
   initialData: ValidatedShopFormData & { id: string; latitude?: number; longitude?: number };
@@ -44,43 +43,7 @@ const ShopEditForm: React.FC<ShopEditFormProps> = ({ initialData, onSave, onCanc
   const [locationLoading, setLocationLoading] = useState(false);
   const [addressValidating, setAddressValidating] = useState(false);
   const [addressValid, setAddressValid] = useState<boolean | null>(null);
-  const [addressComponents, setAddressComponents] = useState({
-    country: '',
-    state: '',
-    city: '',
-    street: '',
-  });
 
-  // Function to build full address from components
-  const buildAddressFromComponents = (components: typeof addressComponents): string => {
-    const parts = [
-      components.street,
-      components.city,
-      components.state,
-      components.country
-    ].filter(part => part.trim() !== '');
-    return parts.join(', ');
-  };
-
-  // Function to parse address into components
-  const parseAddressToComponents = (address: string): typeof addressComponents => {
-    const parts = address.split(',').map(part => part.trim());
-    return {
-      street: parts[0] || '',
-      city: parts[1] || '',
-      state: parts[2] || '',
-      country: parts[3] || '',
-    };
-  };
-
-  // Sync address components when main address field changes
-  useEffect(() => {
-    const currentAddress = form.watch('address') || '';
-    if (currentAddress && !addressComponents.street && !addressComponents.city && !addressComponents.state && !addressComponents.country) {
-      const parsed = parseAddressToComponents(currentAddress);
-      setAddressComponents(parsed);
-    }
-  }, [form.watch('address'), addressComponents.city, addressComponents.country, addressComponents.state, addressComponents.street, parseAddressToComponents]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -428,70 +391,7 @@ const ShopEditForm: React.FC<ShopEditFormProps> = ({ initialData, onSave, onCanc
                 )}
               />
 
-              {/* Manual Address Input with Auto-complete */}
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <MapIcon className="w-4 h-4" />
-                  Manual Address Input (with Auto-complete)
-                </Label>
-                <div className="grid grid-cols-1 gap-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <AutoCompleteInput
-                      value={addressComponents.country}
-                      onChange={(value) => {
-                        const newComponents = { ...addressComponents, country: value };
-                        setAddressComponents(newComponents);
-                        const newAddress = buildAddressFromComponents(newComponents);
-                        form.setValue("address", newAddress);
-                      }}
-                      placeholder="e.g. India"
-                      type="country"
-                      className="text-sm"
-                    />
-                    <AutoCompleteInput
-                      value={addressComponents.state}
-                      onChange={(value) => {
-                        const newComponents = { ...addressComponents, state: value };
-                        setAddressComponents(newComponents);
-                        const newAddress = buildAddressFromComponents(newComponents);
-                        form.setValue("address", newAddress);
-                      }}
-                      placeholder="e.g. Karnataka"
-                      type="state"
-                      className="text-sm"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <AutoCompleteInput
-                      value={addressComponents.city}
-                      onChange={(value) => {
-                        const newComponents = { ...addressComponents, city: value };
-                        setAddressComponents(newComponents);
-                        const newAddress = buildAddressFromComponents(newComponents);
-                        form.setValue("address", newAddress);
-                      }}
-                      placeholder="e.g. Ballari"
-                      type="city"
-                      className="text-sm"
-                    />
-                    <AutoCompleteInput
-                      value={addressComponents.street}
-                      onChange={(value) => {
-                        const newComponents = { ...addressComponents, street: value };
-                        setAddressComponents(newComponents);
-                        const newAddress = buildAddressFromComponents(newComponents);
-                        form.setValue("address", newAddress);
-                      }}
-                      placeholder="e.g. Renuka Nagar"
-                      type="street"
-                      className="text-sm"
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Start typing to get auto-complete suggestions. Fill in the address components manually or use "Use Current Location" above for auto-fill.
-                </p>
-              </div>
+
 
               <FormField
                 control={form.control}
