@@ -353,10 +353,6 @@ export default function CustomerProfile() {
         if (customerError) throw customerError;
       }
 
-      // Delete auth user
-      const { error: authError } = await supabase.auth.admin.deleteUser(user!.id);
-      if (authError) throw authError;
-
       await signOut();
       navigate("/");
     } catch (error) {

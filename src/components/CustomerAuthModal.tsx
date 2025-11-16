@@ -54,16 +54,32 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }
         if (error) throw error;
 
         if (authData.user) {
-          const { data: customerData } = await supabase
+          let { data: customerData } = await supabase
             .from("customers")
             .select("id")
             .eq("user_id", authData.user.id)
             .single();
 
           if (!customerData) {
-            toast.error("This account is not registered as a customer.");
-            await supabase.auth.signOut();
-            return;
+            // Create customer profile on first login using metadata
+            const { data: newCustomerData, error: insertError } = await supabase
+              .from("customers")
+              .insert({
+                user_id: authData.user.id,
+                email: authData.user.email || "",
+                full_name: authData.user.user_metadata?.full_name || "",
+                phone: authData.user.user_metadata?.phone || "",
+              })
+              .select("id")
+              .single();
+
+            if (insertError) {
+              console.error("Error creating customer profile:", insertError);
+              toast.error("Failed to create customer profile.");
+              return;
+            }
+
+            customerData = newCustomerData;
           }
 
           toast.success("Login successful!");
@@ -80,25 +96,18 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }
       try {
         const { data: authData, error } = await supabase.auth.signUp({
           email: signupData.email,
-          password: signupData.password
+          password: signupData.password,
+          options: {
+            data: {
+              full_name: signupData.fullName || "",
+              phone: signupData.phone || "",
+            }
+          }
         });
 
         if (error) throw error;
 
         if (authData.user) {
-          const { error: insertError } = await supabase.from("customers").insert({
-            user_id: authData.user.id,
-            email: signupData.email,
-            full_name: signupData.fullName || "",
-            phone: signupData.phone || "",
-          });
-
-          if (insertError) {
-            console.error("Error creating customer profile:", insertError);
-            toast.error("Signup failed to create customer profile.");
-            return;
-          }
-
           toast.success("Account created successfully! Please check your email to verify.");
           setIsLogin(true);
         }

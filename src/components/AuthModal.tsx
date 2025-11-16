@@ -61,20 +61,33 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess }
         if (error) throw error;
 
         if (authData.user) {
-          const { data: ownerData } = await supabase
+          let { data: ownerData } = await supabase
             .from("shop_owners")
             .select("id")
             .eq("user_id", authData.user.id)
             .single();
 
-          if (ownerData) {
-            onLoginSuccess(ownerData.id);
-            toast.success("Login successful!");
-            onClose();
-            navigate("/dashboard");
-          } else {
-            toast.warning("No shop owner profile found. Please create one.");
+          if (!ownerData) {
+            // Create shop owner profile on first login
+            const { data: newOwnerData, error: insertError } = await supabase
+              .from("shop_owners")
+              .insert({ user_id: authData.user.id })
+              .select("id")
+              .single();
+
+            if (insertError) {
+              console.error("Error creating shop owner profile:", insertError);
+              toast.error("Failed to create shop owner profile.");
+              return;
+            }
+
+            ownerData = newOwnerData;
           }
+
+          onLoginSuccess(ownerData.id);
+          toast.success("Login successful!");
+          onClose();
+          navigate("/dashboard");
         }
       } catch (err) {
         console.error("Login error:", err);
@@ -85,24 +98,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess }
     } else {
       const signupData = data as SignupFormData;
       try {
-        const { data: authData, error } = await supabase.auth.signUp({ 
-          email: signupData.email, 
-          password: signupData.password 
+        const { data: authData, error } = await supabase.auth.signUp({
+          email: signupData.email,
+          password: signupData.password
         });
 
         if (error) throw error;
 
         if (authData.user) {
-          const { error: insertError } = await supabase.from("shop_owners").insert({
-            user_id: authData.user.id,
-          });
-
-          if (insertError) {
-            console.error("Error creating shop owner profile:", insertError);
-            toast.error("Signup failed to create shop owner profile.");
-            return;
-          }
-
           toast.success("Signup successful! Please check your email for verification.");
           setIsLogin(true);
         }
