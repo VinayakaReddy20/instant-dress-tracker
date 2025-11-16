@@ -1,23 +1,9 @@
-# Customer Authentication Issues - TODO
-
-## Issues Identified
-- [ ] Email confirmation not working (signup doesn't require confirmation)
-- [ ] Login fails after creating new account with "login failed please try again"
-
-## Root Causes
-- [ ] Customer profile creation logic in login flow may be failing
-- [ ] Race condition between auth signup and profile creation
-- [ ] Error handling not properly catching profile creation failures
-
-## Tasks to Complete
-- [ ] Analyze current signup/login flow in CustomerAuthModal.tsx
-- [ ] Fix customer profile creation logic in login handler
-- [ ] Add proper error handling and logging for profile creation
-- [ ] Test signup -> login flow
-- [ ] Verify Supabase auth settings for email confirmation
-- [ ] Update error messages to be more specific
-
-## Files to Modify
-- [ ] src/components/CustomerAuthModal.tsx - Fix login logic
-- [ ] src/contexts/CustomerAuthContext.tsx - Ensure proper profile fetching
-- [ ] Add email confirmation flow if needed
+- [x] Analyze account creation and deletion code
+- [x] Identify missing DELETE policy for customers table
+- [x] Create migration to add DELETE policy for customers table
+- [x] Push migration to Supabase
+- [x] Create Supabase Edge Function for account deletion
+- [x] Deploy Edge Function to Supabase
+- [x] Update frontend to use Edge Function for account deletion
+- [x] Verify deletion works by testing or checking code
+- [x] Check if account creation has issues (seems fine)

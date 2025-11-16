@@ -26,7 +26,7 @@ interface CustomerAuthContextType {
   signOut: () => Promise<void>;
 }
 
-const CustomerAuthContext = createContext<CustomerAuthContextType | undefined>(undefined);
+export const CustomerAuthContext = createContext<CustomerAuthContextType | undefined>(undefined);
 
 export const CustomerAuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -108,10 +108,4 @@ export const CustomerAuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const useCustomerAuth = (): CustomerAuthContextType => {
-  const context = useContext(CustomerAuthContext);
-  if (!context) {
-    throw new Error("useCustomerAuth must be used within a CustomerAuthProvider");
-  }
-  return context;
-};
+

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import AuthModal from "@/components/AuthModal";
 import CartDrawer from "@/components/CartDrawer";
 import { useCart } from "@/contexts/CartContext";
-import { useCustomerAuth } from "@/contexts/CustomerAuthContext";
+import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import { useAuthModal } from "@/contexts/AuthModalContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 

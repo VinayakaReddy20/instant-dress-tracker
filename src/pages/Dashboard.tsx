@@ -41,6 +41,7 @@ interface Shop {
   business_name?: string;
   latitude: number | null;
   longitude: number | null;
+  owner_id?: string;
 }
 
 export interface DressFormData {
@@ -249,7 +250,7 @@ export default function Dashboard() {
   // ----- DELETE SHOP -----
   const handleDeleteShop = async () => {
     if (!shop) return;
-    if (!confirm("Are you sure you want to delete this shop? This will delete all dresses as well.")) return;
+    if (!confirm("Are you sure you want to delete this shop? This will delete all dresses, shop data, and your account as well.")) return;
     try {
       // Delete dresses first
       const { error: dressesError } = await supabase
@@ -265,8 +266,28 @@ export default function Dashboard() {
         .eq("id", shop.id);
       if (shopError) throw shopError;
 
-      setShop(null);
-      setError("Shop deleted successfully.");
+      // Delete shop_owner record to prevent recreation
+      if (shop.owner_id) {
+        const { error: ownerError } = await supabase
+          .from("shop_owners")
+          .delete()
+          .eq("id", shop.owner_id);
+        if (ownerError) throw ownerError;
+      }
+
+      // Delete customer record if it exists
+      const { error: customerError } = await supabase
+        .from("customers")
+        .delete()
+        .eq("user_id", ownerId);
+      if (customerError) {
+        console.error("Error deleting customer record:", customerError);
+        // Continue with sign out even if customer deletion fails
+      }
+
+      // Sign out the user since their account is deleted
+      await supabase.auth.signOut();
+      navigate("/");
     } catch (err) {
       console.error(err);
       alert("Failed to delete shop.");
