@@ -51,22 +51,34 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }
           password: loginData.password,
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error("Auth login error:", error);
+          toast.error("Invalid email or password. Please try again.");
+          return;
+        }
 
         if (authData.user) {
-          let { data: customerData } = await supabase
+          // Check if customer profile exists
+          const { data: customerData, error: fetchError } = await supabase
             .from("customers")
             .select("id")
             .eq("user_id", authData.user.id)
             .single();
 
+          if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "not found"
+            console.error("Error fetching customer profile:", fetchError);
+            toast.error("Failed to verify customer profile. Please try again.");
+            return;
+          }
+
           if (!customerData) {
             // Create customer profile on first login using metadata
+            console.log("Creating customer profile for user:", authData.user.id);
             const { data: newCustomerData, error: insertError } = await supabase
               .from("customers")
               .insert({
                 user_id: authData.user.id,
-                email: authData.user.email || "",
+                email: authData.user.email || loginData.email,
                 full_name: authData.user.user_metadata?.full_name || "",
                 phone: authData.user.user_metadata?.phone || "",
               })
@@ -75,11 +87,13 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }
 
             if (insertError) {
               console.error("Error creating customer profile:", insertError);
-              toast.error("Failed to create customer profile.");
+              // Don't fail login if profile creation fails, but log it
+              toast.error("Login successful, but profile setup failed. Please contact support.");
+              executeCallback();
               return;
             }
 
-            customerData = newCustomerData;
+            console.log("Customer profile created successfully:", newCustomerData);
           }
 
           toast.success("Login successful!");
@@ -87,7 +101,12 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }
         }
       } catch (err) {
         console.error("Login error:", err);
-        toast.error("Login failed. Please try again.");
+        const error = err as AuthError;
+        if (error?.message?.includes("Invalid login credentials")) {
+          toast.error("Invalid email or password. Please check your credentials.");
+        } else {
+          toast.error("Login failed. Please try again.");
+        }
       } finally {
         setIsLoading(false);
       }
