@@ -36,29 +36,47 @@ export type Database = {
     Tables: {
       customers: {
         Row: {
+          address: string | null
+          city: string | null
           created_at: string
           email: string
           full_name: string | null
           id: string
+          latitude: number | null
+          longitude: number | null
           phone: string | null
+          pincode: string | null
+          profile_picture_url: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          address?: string | null
+          city?: string | null
           created_at?: string
           email: string
           full_name?: string | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           phone?: string | null
+          pincode?: string | null
+          profile_picture_url?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          address?: string | null
+          city?: string | null
           created_at?: string
           email?: string
           full_name?: string | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           phone?: string | null
+          pincode?: string | null
+          profile_picture_url?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -356,4 +374,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

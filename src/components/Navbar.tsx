@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, memo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Store, Search, User, Menu, ShoppingCart, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const location = useLocation();
   const { totalQuantity } = useCart();
-  const { user, signOut } = useCustomerAuth();
+  const { user, customerProfile, signOut } = useCustomerAuth();
   const { openModal } = useAuthModal();
   const isMobile = useIsMobile();
 
@@ -103,7 +103,18 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
               </Button>
               {user ? (
                 <div className="flex items-center space-x-4">
-                  <span className="text-gray-700 font-medium">Hello, {user.email}</span>
+                  <span className="text-gray-700 font-medium">Hello, {customerProfile?.full_name || user.email?.split('@')[0]}</span>
+                  <Link
+                    to="/customer-profile"
+                    className={`px-3 py-2 rounded-md text-sm font-medium ${
+                      isActive("/customer-profile")
+                        ? "bg-primary text-white"
+                        : "text-gray-700 hover:bg-gray-100"
+                    } flex items-center space-x-1`}
+                  >
+                    <User className="w-4 h-4" />
+                    <span>Profile</span>
+                  </Link>
                   <Button
                     variant="outline"
                     onClick={() => signOut()}
@@ -114,13 +125,23 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
                   </Button>
                 </div>
               ) : (
-                <Button
-                  onClick={() => setIsAuthModalOpen(true)}
-                  className="bg-primary text-white hover:bg-primary-dark flex items-center space-x-1 px-3 py-2 rounded-md"
-                >
-                  <User className="w-4 h-4" />
-                  <span>Shop Owner</span>
-                </Button>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    onClick={handleCustomerLogin}
+                    variant="outline"
+                    className="flex items-center space-x-1 px-3 py-2 rounded-md"
+                  >
+                    <User className="w-4 h-4" />
+                    <span>Customer</span>
+                  </Button>
+                  <Button
+                    onClick={() => setIsAuthModalOpen(true)}
+                    className="bg-primary text-white hover:bg-primary-dark flex items-center space-x-1 px-3 py-2 rounded-md"
+                  >
+                    <User className="w-4 h-4" />
+                    <span>Shop Owner</span>
+                  </Button>
+                </div>
               )}
             </div>
 
@@ -168,6 +189,25 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
                   </Badge>
                 )}
               </Button>
+              {user ? (
+                <Link
+                  to="/customer-profile"
+                  className="block px-4 py-2 rounded-md text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <User className="w-4 h-4" />
+                  <span>Profile</span>
+                </Link>
+              ) : (
+                <Button
+                  onClick={handleCustomerLogin}
+                  variant="outline"
+                  className="w-full flex items-center justify-center space-x-2 px-4 py-2 rounded-md"
+                >
+                  <User className="w-4 h-4" />
+                  <span>Customer</span>
+                </Button>
+              )}
               <Button
                 onClick={() => {
                   setIsAuthModalOpen(true);
@@ -201,4 +241,4 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
   );
 };
 
-export default Navbar;
+export default memo(Navbar);

@@ -1,4 +1,3 @@
-// src/App.tsx
 import { useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -18,34 +17,20 @@ import ResetPassword from "./pages/ResetPassword";
 import AuthModal from "@/components/AuthModal";
 import CustomerAuthModal from "@/components/CustomerAuthModal";
 import CustomerAuth from "./pages/CustomerAuth";
+import CustomerProfile from "./pages/CustomerProfile";
 import { supabase } from "@/integrations/supabaseClient";
 import { CartProvider } from "@/contexts/CartContext";
 import { AuthModalProvider, useAuthModal } from "@/contexts/AuthModalContext";
-import { CustomerAuthProvider } from "@/contexts/CustomerAuthContext";
+import { CustomerAuthProvider, useCustomerAuth } from "@/contexts/CustomerAuthContext";
 
 const queryClient = new QueryClient();
 
 // --- Protected Route ---
 const ProtectedRoute: React.FC<{ children: JSX.Element | null }> = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const { user, isLoading } = useCustomerAuth();
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data } = await supabase.auth.getUser();
-      setIsAuthenticated(!!data.user);
-    };
-
-    checkAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      checkAuth();
-    });
-
-    return () => subscription?.unsubscribe();
-  }, []);
-
-  if (isAuthenticated === null) return null; // waiting for auth check
-  if (!isAuthenticated) return <Navigate to="/" replace />;
+  if (isLoading) return null; // waiting for auth check
+  if (!user) return <Navigate to="/" replace />;
   return children;
 };
 
@@ -84,7 +69,7 @@ const AppContent: React.FC = () => {
     <>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthModal
           isOpen={authModalOpen}
           onClose={() => setAuthModalOpen(false)}
@@ -110,6 +95,15 @@ const AppContent: React.FC = () => {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/customer-profile"
+            element={
+              <ProtectedRoute>
+                <CustomerProfile />
               </ProtectedRoute>
             }
           />

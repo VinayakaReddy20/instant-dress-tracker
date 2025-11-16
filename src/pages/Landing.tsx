@@ -17,7 +17,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useIsMobile } from "@/hooks/use-mobile";
 import { debugLog, logApiError } from "@/lib/errorHandling";
 
-import type { Database } from "@/integrations/supabase/types";
+import type { Database } from "@/types";
 
 // Use database schema types
 type Shop = Database["public"]["Tables"]["shops"]["Row"];

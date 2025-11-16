@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { supabase } from "@/integrations/supabaseClient";
 import { toast } from "@/components/ui/use-toast";
 import { useAuthModal } from "@/contexts/AuthModalContext";
@@ -29,12 +29,28 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const { openModal } = useAuthModal();
 
+  // Cache auth state to avoid repeated checks
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getSession();
+      setIsAuthenticated(!!data.session);
+    };
+
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   const addToCart = async (item: Omit<CartItem, "quantity">) => {
-    // Check if customer is logged in
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) {
+    // Use cached auth state instead of checking every time
+    if (isAuthenticated === false) {
       // Trigger auth modal with callback to add to cart after login
       openModal(() => addToCart(item));
       return;
