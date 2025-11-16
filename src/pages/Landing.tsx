@@ -16,7 +16,6 @@ import { useAuthModal } from "@/contexts/AuthModalContext";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { debugLog, logApiError } from "@/lib/errorHandling";
-
 import type { Database } from "@/types";
 
 // Use database schema types
@@ -430,7 +429,7 @@ const Landing = () => {
       {/* Hero Section */}
       {!searchQuery && (
         <motion.section
-          className="min-h-[80vh] flex items-center justify-center relative overflow-hidden"
+          className={`${isMobile ? 'min-h-[60vh]' : 'min-h-[80vh]'} flex items-center justify-center relative overflow-hidden`}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
@@ -443,10 +442,10 @@ const Landing = () => {
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
 
           <div className="container mx-auto px-4 z-10 text-center">
-            <h1 className="text-5xl md:text-7xl font-playfair font-bold text-white leading-tight">
+            <h1 className={`${isMobile ? 'text-3xl' : 'text-5xl md:text-7xl'} font-playfair font-bold text-white leading-tight`}>
               Instant <span className="bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">Dress Tracker</span>
             </h1>
-            <p className="text-xl md:text-2xl text-white/90 max-w-2xl mx-auto mt-4">
+            <p className={`${isMobile ? 'text-lg' : 'text-xl md:text-2xl'} text-white/90 max-w-2xl mx-auto mt-4`}>
               Find your perfect dress instantly and check real-time availability in local shops.
             </p>
           </div>
@@ -909,7 +908,7 @@ const Landing = () => {
           </div>
 
           <motion.div
-            className="grid md:grid-cols-3 gap-8"
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8"
             variants={container}
             initial="hidden"
             whileInView="visible"
@@ -963,7 +962,7 @@ const Landing = () => {
     <h2 className="text-3xl font-playfair font-bold text-center mb-12">New Arrivals</h2>
 
     {dresses.length > 0 ? (
-      <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-8">
+      <div className={`grid ${isMobile ? 'grid-cols-1 sm:grid-cols-2' : 'md:grid-cols-3 lg:grid-cols-4'} gap-8`}>
         {dresses
           // Sort by created_at (latest first)
           .sort((a, b) => {
@@ -1039,7 +1038,7 @@ const Landing = () => {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-playfair font-bold mb-4">Stay in Style</h2>
           <p className="text-xl mb-6 max-w-2xl mx-auto">Subscribe to our newsletter for exclusive offers, new arrivals, and style tips</p>
-          <div className="max-w-md mx-auto flex gap-3">
+          <div className="max-w-md mx-auto flex gap-4">
             <Input
               type="email"
               placeholder="Enter your email"
