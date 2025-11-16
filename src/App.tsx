@@ -21,7 +21,8 @@ import CustomerProfile from "./pages/CustomerProfile";
 import { supabase } from "@/integrations/supabaseClient";
 import { CartProvider } from "@/contexts/CartContext";
 import { AuthModalProvider, useAuthModal } from "@/contexts/AuthModalContext";
-import { CustomerAuthProvider, useCustomerAuth } from "@/contexts/CustomerAuthContext";
+import { CustomerAuthProvider } from "@/contexts/CustomerAuthContext";
+import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 
 const queryClient = new QueryClient();
 

@@ -9,8 +9,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabaseClient";
-import { useCustomerAuth } from "@/contexts/CustomerAuthContext";
+import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import Navbar from "@/components/Navbar";
 import { getCurrentLocation, reverseGeocode } from "@/lib/geolocation";
 import {
@@ -70,6 +78,7 @@ export default function CustomerProfile() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [enablingLocation, setEnablingLocation] = useState(false);
   const [updatingProfile, setUpdatingProfile] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Fetch customer profile
   useEffect(() => {
@@ -340,9 +349,22 @@ export default function CustomerProfile() {
 
   // Handle delete account
   const handleDeleteAccount = async () => {
-    if (!confirm("Are you sure you want to delete your account? This action cannot be undone.")) return;
+    setShowDeleteDialog(false);
 
     try {
+      // First delete shop_owner record if exists (to cascade delete shops and dresses)
+      if (user) {
+        const { error: shopOwnerError } = await supabase
+          .from("shop_owners")
+          .delete()
+          .eq("user_id", user.id);
+
+        if (shopOwnerError) {
+          console.error("Error deleting shop owner:", shopOwnerError);
+          // Continue with customer deletion even if shop owner deletion fails
+        }
+      }
+
       // Delete customer record
       if (profile) {
         const { error: customerError } = await supabase
@@ -756,7 +778,7 @@ export default function CustomerProfile() {
                       <LogOut className="w-4 h-4 mr-2" />
                       Logout
                     </Button>
-                    <Button variant="destructive" onClick={handleDeleteAccount}>
+                    <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
                       <Trash2 className="w-4 h-4 mr-2" />
                       Delete Account
                     </Button>
@@ -767,6 +789,28 @@ export default function CustomerProfile() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Delete Account Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Account</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete your account? This action cannot be undone.
+              All your data, including profile information and any associated shops or dresses,
+              will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteAccount}>
+              Delete Account
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

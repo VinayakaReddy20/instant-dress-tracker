@@ -2,7 +2,7 @@ import React from "react";
 import { ShoppingCart, X, Plus, Minus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useCart, CartItem } from "@/contexts/CartContext";
 
 interface CartDrawerProps {
@@ -13,7 +13,7 @@ interface CartDrawerProps {
 const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onOpenChange }) => {
   const { cart, addToCart, updateQuantity, removeFromCart, clearCart, totalQuantity } = useCart();
 
-  const totalPrice = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const totalPrice = cart.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
 
   const handleIncreaseQuantity = (item: CartItem) => {
     addToCart(item);
@@ -31,6 +31,9 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onOpenChange }) => {
             <ShoppingCart className="w-5 h-5" />
             Shopping Cart ({totalQuantity})
           </SheetTitle>
+          <SheetDescription>
+            Review and manage your cart items
+          </SheetDescription>
         </SheetHeader>
 
         <div className="flex flex-col h-full">
@@ -54,7 +57,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onOpenChange }) => {
                     <div className="flex-1">
                       <h3 className="font-semibold text-sm">{item.name}</h3>
                       <p className="text-xs text-gray-500">{item.shop?.name}</p>
-                      <p className="text-sm font-bold text-primary">₹{item.price.toLocaleString("en-IN")}</p>
+                      <p className="text-sm font-bold text-primary">₹{(item.price || 0).toLocaleString("en-IN")}</p>
                       <div className="flex items-center gap-2 mt-2">
                         <Badge variant="outline" className="text-xs">{item.size}</Badge>
                         {item.color && <Badge variant="outline" className="text-xs">{item.color}</Badge>}
