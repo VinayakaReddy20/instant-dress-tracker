@@ -11,12 +11,16 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import heroBoutique from "@/assets/hero-boutique.jpg";
 import { supabase } from "@/integrations/supabaseClient";
-import { useCart } from "@/contexts/CartContext";
+import { useCart } from "@/contexts/CartTypes";
 import { useAuthModal } from "@/contexts/AuthModalContext";
+import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { debugLog, logApiError } from "@/lib/errorHandling";
-import type { Database } from "@/types";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { debugLog, logApiError, logApiErrorWithOfflineCheck } from "@/lib/errorHandling";
+import { subscribeSchema } from "@/lib/validations";
+
+import type { Database } from "@/integrations/supabase/types";
 
 // Use database schema types
 type Shop = Database["public"]["Tables"]["shops"]["Row"];
@@ -30,18 +34,19 @@ type CartItem = Dress & {
 };
 
 const Landing = () => {
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const [shops, setShops] = useState<Shop[]>([]);
-  const [dresses, setDresses] = useState<Dress[]>([]);
-  const [selectedDress, setSelectedDress] = useState<Dress | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const isMobile = useIsMobile();
-  const [loading, setLoading] = useState(false);
+   const navigate = useNavigate();
+   const { toast } = useToast();
+   const [shops, setShops] = useState<Shop[]>([]);
+   const [dresses, setDresses] = useState<Dress[]>([]);
+   const [selectedDress, setSelectedDress] = useState<Dress | null>(null);
+   const [isModalOpen, setIsModalOpen] = useState(false);
+   const isMobile = useIsMobile();
+   const [loading, setLoading] = useState(false);
+   const { isOnline, isOffline, wasOffline } = useOnlineStatus();
 
-  // New state for newsletter email input and loading
-  const [email, setEmail] = useState("");
-  const [isSubscribing, setIsSubscribing] = useState(false);
+   // New state for newsletter email input and loading
+   const [email, setEmail] = useState("");
+   const [isSubscribing, setIsSubscribing] = useState(false);
 
   const { cart, addToCart } = useCart();
 
@@ -181,30 +186,13 @@ const Landing = () => {
         setDresses([]);
       }
     } catch (error: unknown) {
-      logApiError("fetchDresses", error);
+      const errorInfo = logApiErrorWithOfflineCheck("fetchDresses", error);
 
-      // Provide more specific error messages based on error type
-      let title = "Failed to load dresses";
-      let description = "Please check your connection and try again.";
-
-      if (error && typeof error === 'object' && 'code' in error) {
-        const err = error as { code?: string; message?: string };
-        if (err.code === 'PGRST116') {
-          title = "Database connection issue";
-          description = "Unable to connect to the database. Please try again later.";
-        } else if (err.code === '42P01') {
-          title = "Table not found";
-          description = "The dresses table doesn't exist. Please contact support.";
-        } else if (err.code === '42703') {
-          title = "Column error";
-          description = "There's an issue with the database schema. Please contact support.";
-        }
-      }
-
+      // Show appropriate toast based on error type
       toast({
-        variant: "destructive",
-        title,
-        description,
+        variant: errorInfo.isOffline ? "default" : "destructive",
+        title: errorInfo.title,
+        description: errorInfo.description,
       });
 
       // Set empty array on error to prevent UI crashes
@@ -248,6 +236,19 @@ const Landing = () => {
       fetchDresses(searchQuery);
     }
   }, [searchQuery, fetchDresses]);
+
+  // Show toast when coming back online
+  useEffect(() => {
+    if (wasOffline && isOnline) {
+      toast({
+        title: "Back online!",
+        description: "You're connected again. Refreshing data...",
+      });
+      // Auto-refresh data when coming back online
+      fetchDresses(searchQuery);
+      fetchShops();
+    }
+  }, [wasOffline, isOnline, toast, searchQuery, fetchDresses]);
 
   // Filter logic
   useEffect(() => {
@@ -357,32 +358,39 @@ const Landing = () => {
 
   // Customer authentication check for addToCart
   const { openModal } = useAuthModal();
+  const { user } = useCustomerAuth();
 
   const handleAddToCart = (dress: Dress) => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) {
-        openModal(() => handleAddToCart(dress));
-      } else {
-        addToCart({
-          id: dress.id,
-          name: dress.name,
-          price: dress.price || 0,
-          size: dress.size,
-          color: dress.color || undefined,
-          category: dress.category || undefined,
-          image_url: dress.image_url || undefined,
-          shop_id: dress.shop_id,
-          shop: dress.shops ? {
-            name: dress.shops.name,
-            location: dress.shops.location || ""
-          } : undefined,
-        });
-        toast({
-          title: "Added to cart!",
-          description: `${dress.name} has been added to your cart.`,
-        });
-      }
-    });
+    if (!dress.stock || dress.stock <= 0) {
+      toast({
+        title: "Out of Stock",
+        description: "This dress is currently out of stock and cannot be added to your cart.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!user) {
+      openModal(() => handleAddToCart(dress));
+    } else {
+      addToCart({
+        id: dress.id,
+        name: dress.name,
+        price: dress.price || 0,
+        size: dress.size,
+        color: dress.color || undefined,
+        category: dress.category || undefined,
+        image_url: dress.image_url || undefined,
+        shop_id: dress.shop_id,
+        shop: dress.shops ? {
+          name: dress.shops.name,
+          location: dress.shops.location || ""
+        } : undefined,
+      });
+      toast({
+        title: "Added to cart!",
+        description: `${dress.name} has been added to your cart.`,
+      });
+    }
   };
 
   // Animation variants
@@ -425,6 +433,30 @@ const Landing = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar onSearch={setSearchQuery} />
+
+      {/* Offline Banner */}
+      {isOffline && (
+        <div className="bg-orange-100 border-b border-orange-200 px-4 py-3">
+          <div className="container mx-auto flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-orange-500 rounded-full mr-3 animate-pulse"></div>
+              <span className="text-orange-800 font-medium">You're offline</span>
+              <span className="text-orange-600 ml-2">Some features may not be available</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                fetchDresses(searchQuery);
+                fetchShops();
+              }}
+              className="border-orange-300 text-orange-700 hover:bg-orange-50"
+            >
+              Retry
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Hero Section */}
       {!searchQuery && (
@@ -555,8 +587,11 @@ const Landing = () => {
                 {filteredShops.map((shop) => (
                   <Card key={shop.id} className="min-w-[320px] flex-shrink-0 snap-start group hover:shadow-xl transition-all duration-300 border-0 shadow-md bg-white">
                     <div className="block cursor-pointer" onClick={() => {
-                      // Temporarily force modal to open for testing
-                      openModal(() => navigate(`/shop/${shop.id}`));
+                      if (!user) {
+                        openModal(() => navigate(`/shop/${shop.id}`));
+                      } else {
+                        navigate(`/shop/${shop.id}`);
+                      }
                     }}>
                       <div className="relative overflow-hidden rounded-t-xl">
                         <img
@@ -645,13 +680,11 @@ const Landing = () => {
                             size="sm"
                             className="bg-white hover:bg-gray-50 text-gray-900 font-medium shadow-lg"
                             onClick={() => {
-                              supabase.auth.getSession().then(({ data }) => {
-                                if (!data.session) {
-                                  openModal(() => openQuickView(dress));
-                                } else {
-                                  openQuickView(dress);
-                                }
-                              });
+                              if (!user) {
+                                openModal(() => openQuickView(dress));
+                              } else {
+                                openQuickView(dress);
+                              }
                             }}
                           >
                             <Eye className="w-4 h-4 mr-2" />
@@ -799,13 +832,11 @@ const Landing = () => {
                               size="sm"
                               className="px-4 border-gray-300 hover:bg-gray-50"
                               onClick={() => {
-                                supabase.auth.getSession().then(({ data }) => {
-                                  if (!data.session) {
-                                    openModal(() => openQuickView(dress));
-                                  } else {
-                                    openQuickView(dress);
-                                  }
-                                });
+                                if (!user) {
+                                  openModal(() => openQuickView(dress));
+                                } else {
+                                  openQuickView(dress);
+                                }
                               }}
                             >
                               <Eye className="w-4 h-4" />
@@ -1019,7 +1050,11 @@ const Landing = () => {
                   <p className="text-sm text-gray-500">{shop.location}</p>
               <Button className="mt-4 w-full bg-gradient-to-r from-primary to-primary/80 text-white hover:from-primary/90 hover:to-primary/70"
                 onClick={() => {
-                  openModal(() => navigate(`/shop/${shop.id}`));
+                  if (!user) {
+                    openModal(() => navigate(`/shop/${shop.id}`));
+                  } else {
+                    navigate(`/shop/${shop.id}`);
+                  }
                 }}
               >
                 View Shop
@@ -1050,21 +1085,13 @@ const Landing = () => {
             <Button
               className="bg-white text-primary hover:bg-gray-100"
               onClick={async () => {
-                if (!email) {
-                  toast({
-                    variant: "destructive",
-                    title: "Email is required",
-                    description: "Please enter your email address to subscribe.",
-                  });
-                  return;
-                }
-                // Basic email format validation
-                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                if (!emailRegex.test(email)) {
+                const validation = subscribeSchema.safeParse({ email });
+                if (!validation.success) {
+                  const errorMessages = validation.error.errors.map(err => err.message).join('\n');
                   toast({
                     variant: "destructive",
                     title: "Invalid email",
-                    description: "Please enter a valid email address.",
+                    description: errorMessages,
                   });
                   return;
                 }

@@ -35,21 +35,30 @@ interface MapProps {
 
 const Map = ({
   shops,
-  center = [15.1394, 76.9214], // Default to Ballari coordinates
+  center = [15.1394, 76.9214],
   zoom = 13,
   height = "400px",
   onMarkerClick
 }: MapProps) => {
-  // Filter shops with valid coordinates
   const validShops = shops.filter(shop => shop.latitude && shop.longitude);
 
+  const handleMapClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
   return (
-    <div style={{ height, width: '100%' }}>
+    <div 
+      style={{ height, width: '100%', pointerEvents: 'auto' }}
+      onClick={handleMapClick}
+      onMouseDown={handleMapClick}
+      onTouchStart={handleMapClick}
+    >
       <MapContainer
         center={center}
         zoom={zoom}
         style={{ height: '100%', width: '100%' }}
         scrollWheelZoom={false}
+        dragging={true}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

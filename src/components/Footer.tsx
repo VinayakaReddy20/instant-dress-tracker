@@ -1,6 +1,7 @@
 import { Facebook, Instagram, Twitter, Mail, Phone, MapPin, User, Star, Send } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
+import { feedbackSchema } from "../lib/validations";
 
 const Footer = () => {
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
@@ -29,14 +30,19 @@ const Footer = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!feedbackText.trim() || rating === 0) {
-      alert("Please provide a rating and feedback message.");
-      return;
-    }
 
-    // Validate email if provided
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      alert("Please enter a valid email address.");
+    const formData = {
+      rating,
+      category: category as "General Feedback" | "Bug Report" | "Suggestion" | "Experience",
+      name: name || undefined,
+      email: email || undefined,
+      feedback: feedbackText,
+    };
+
+    const validation = feedbackSchema.safeParse(formData);
+    if (!validation.success) {
+      const errorMessages = validation.error.errors.map(err => err.message).join('\n');
+      alert(`Validation errors:\n${errorMessages}`);
       return;
     }
 
@@ -244,7 +250,7 @@ const Footer = () => {
               {/* Category */}
               <div>
                 <label htmlFor="category" className="block text-sm font-semibold text-gray-200 mb-3">
-                  Feedback Category
+                  Feedback Category <span className="text-red-400">*</span>
                 </label>
                 <select
                   id="category"
@@ -253,11 +259,9 @@ const Footer = () => {
                   className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-colors"
                 >
                   <option className="bg-gray-700">General Feedback</option>
-                  <option className="bg-gray-700">Product Quality</option>
-                  <option className="bg-gray-700">Customer Service</option>
-                  <option className="bg-gray-700">Website Usability</option>
-                  <option className="bg-gray-700">Order & Delivery</option>
-                  <option className="bg-gray-700">Other</option>
+                  <option className="bg-gray-700">Bug Report</option>
+                  <option className="bg-gray-700">Suggestion</option>
+                  <option className="bg-gray-700">Experience</option>
                 </select>
               </div>
 
@@ -270,7 +274,7 @@ const Footer = () => {
                   type="text"
                   id="name"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => setName(e.target.value.trim())}
                   className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-colors placeholder-gray-400"
                   placeholder="Your name"
                 />
@@ -285,7 +289,7 @@ const Footer = () => {
                   type="email"
                   id="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => setEmail(e.target.value.trim())}
                   className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-colors placeholder-gray-400"
                   placeholder="your.email@example.com"
                 />
@@ -302,8 +306,9 @@ const Footer = () => {
                   rows={4}
                   placeholder="Tell us about your experience, suggestions, or any issues you encountered..."
                   value={feedbackText}
-                  onChange={(e) => setFeedbackText(e.target.value)}
-                  required
+                  onChange={(e) => setFeedbackText(e.target.value.trim())}
+                  minLength={10}
+                  maxLength={500}
                 />
               </div>
 

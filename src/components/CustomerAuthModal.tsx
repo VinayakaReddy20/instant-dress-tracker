@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { useAuthModal } from "@/contexts/AuthModalContext";
+import { verifyEmail } from "@/lib/emailVerification";
 
 interface CustomerAuthModalProps {
   isOpen: boolean;
@@ -24,6 +25,12 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }
 
   const form = useForm<LoginFormData | SignupFormData | ForgotPasswordFormData>({
     resolver: zodResolver(isForgotPassword ? forgotPasswordSchema : isLogin ? loginSchema : signupSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      fullName: "",
+      phone: "",
+    },
   });
 
   const onSubmit = async (data: LoginFormData | SignupFormData | ForgotPasswordFormData) => {
@@ -53,6 +60,10 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }
 
         if (error) {
           console.error("Auth login error:", error);
+          if (error.message?.includes("Email not confirmed") || error.message?.includes("Please check your email")) {
+            toast.error("Please check your email and click the confirmation link before signing in.");
+            return;
+          }
           toast.error("Invalid email or password. Please try again.");
           return;
         }
@@ -112,7 +123,31 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }
       }
     } else {
       const signupData = data as SignupFormData;
+
+      // First, verify the email address
+      setIsLoading(true);
       try {
+        const emailVerification = await verifyEmail(signupData.email);
+
+        if (!emailVerification.isValid) {
+          toast.error(emailVerification.message);
+          setIsLoading(false);
+          return;
+        }
+
+        if (emailVerification.isDisposable) {
+          toast.error("Disposable email addresses are not allowed. Please use a valid email address.");
+          setIsLoading(false);
+          return;
+        }
+
+        if (emailVerification.score < 50) {
+          toast.error("Please use a more reliable email address.");
+          setIsLoading(false);
+          return;
+        }
+
+        // Proceed with signup if email is valid
         const { data: authData, error } = await supabase.auth.signUp({
           email: signupData.email,
           password: signupData.password,

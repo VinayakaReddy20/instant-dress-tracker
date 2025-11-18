@@ -15,19 +15,22 @@ import {
 import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/integrations/supabaseClient";
-import { useCart } from "@/contexts/CartContext";
+import { useCart } from "@/contexts/CartTypes";
 import { useAuthModal } from "@/contexts/AuthModalContext";
+import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import { searchSchema, type SearchFormData } from "@/lib/validations";
 import { toast } from "@/components/ui/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-import { logApiError, debugLog } from "@/lib/errorHandling";
+import { logApiError, debugLog, logApiErrorWithOfflineCheck } from "@/lib/errorHandling";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import type { Dress } from "@/types/shared";
 
 const Dresses = () => {
   const navigate = useNavigate();
   const { addToCart } = useCart();
   const isMobile = useIsMobile();
+  const { isOnline, isOffline, wasOffline } = useOnlineStatus();
 
   const form = useForm<SearchFormData>({
     resolver: zodResolver(searchSchema),
@@ -71,29 +74,42 @@ const Dresses = () => {
     };
   }, []);
 
+  // Show toast when coming back online
+  useEffect(() => {
+    if (wasOffline && isOnline) {
+      toast({
+        title: "Back online!",
+        description: "You're connected again. Refreshing data...",
+      });
+      // Auto-refresh data when coming back online
+      fetchDresses();
+      fetchShops();
+    }
+  }, [wasOffline, isOnline]);
+
   const fetchDresses = async () => {
     try {
       setLoading(true);
 
-      // First, test basic connectivity with a simple query
-      debugLog("Testing basic dresses query...");
-      const { data: testData, error: testError } = await supabase
-        .from("dresses")
-        .select("id")
-        .limit(1);
+      debugLog("Starting dresses fetch...");
 
-      if (testError) {
-        logApiError("Basic dresses query test", testError);
-        throw new Error(`Database connectivity test failed: ${testError.message}`);
-      }
-
-      debugLog("Basic query successful, proceeding with full query...");
-
-      // Build the main query
-      const query = supabase
+      const { data, error } = await supabase
         .from("dresses")
         .select(`
-          *,
+          id,
+          name,
+          price,
+          stock,
+          size,
+          color,
+          category,
+          image_url,
+          description,
+          material,
+          brand,
+          shop_id,
+          created_at,
+          updated_at,
           shops (
             name,
             location
@@ -101,56 +117,29 @@ const Dresses = () => {
         `)
         .order("created_at", { ascending: false });
 
-      debugLog("Executing main dresses query...");
-
-      const { data, error } = await query;
+      debugLog("Executing dresses query...");
 
       if (error) {
-        logApiError("Main dresses query", error);
+        logApiError("Dresses query", error);
         throw error;
       }
 
       if (data) {
         debugLog(`Successfully fetched ${data.length} dresses`);
-
-        setDresses((data as Dress[]) ?? []);
-
-        // Show success message in development
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`✅ Successfully loaded ${data.length} dresses`);
-        }
+        setDresses((data as unknown as Dress[]) ?? []);
       } else {
         debugLog("No dresses data returned");
         setDresses([]);
       }
     } catch (error: unknown) {
-      logApiError("fetchDresses", error);
-
-      // Provide more specific error messages based on error type
-      let title = "Failed to load dresses";
-      let description = "Please check your connection and try again.";
-
-      if (error && typeof error === 'object' && 'code' in error) {
-        const err = error as { code?: string; message?: string };
-        if (err.code === 'PGRST116') {
-          title = "Database connection issue";
-          description = "Unable to connect to the database. Please try again later.";
-        } else if (err.code === '42P01') {
-          title = "Table not found";
-          description = "The dresses table doesn't exist. Please contact support.";
-        } else if (err.code === '42703') {
-          title = "Column error";
-          description = "There's an issue with the database schema. Please contact support.";
-        }
-      }
+      const errorInfo = logApiErrorWithOfflineCheck("fetchDresses", error);
 
       toast({
-        variant: "destructive",
-        title,
-        description,
+        variant: errorInfo.isOffline ? "default" : "destructive",
+        title: errorInfo.title,
+        description: errorInfo.description,
       });
 
-      // Set empty array on error to prevent UI crashes
       setDresses([]);
     } finally {
       setLoading(false);
@@ -208,10 +197,20 @@ const Dresses = () => {
 
   // Customer authentication check for addToCart
   const { openModal } = useAuthModal();
+  const { user } = useCustomerAuth();
 
   const handleAddToCart = (dress: Dress) => {
-    // Temporarily force modal to open for testing
-    openModal(() => {
+    if (!dress.stock || dress.stock <= 0) {
+      toast({
+        title: "Out of Stock",
+        description: "This dress is currently out of stock and cannot be added to your cart.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!user) {
+      openModal(() => handleAddToCart(dress));
+    } else {
       addToCart({
         id: dress.id,
         name: dress.name,
@@ -227,35 +226,36 @@ const Dresses = () => {
         title: "Added to cart!",
         description: `${dress.name} has been added to your cart.`,
       });
-    });
-    /*
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) {
-        openModal(() => handleAddToCart(dress));
-      } else {
-        addToCart({
-          id: dress.id,
-          name: dress.name,
-          price: dress.price,
-          size: dress.size,
-          color: dress.color || undefined,
-          category: dress.category || undefined,
-          image_url: dress.image_url || undefined,
-          shop_id: dress.shop_id,
-          shop: dress.shops ? { name: dress.shops.name, location: dress.shops.location } : undefined
-        });
-        toast({
-          title: "Added to cart!",
-          description: `${dress.name} has been added to your cart.`,
-        });
-      }
-    });
-    */
+    }
   };
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+
+      {/* Offline Banner */}
+      {isOffline && (
+        <div className="bg-orange-100 border-b border-orange-200 px-4 py-3">
+          <div className="container mx-auto flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-orange-500 rounded-full mr-3 animate-pulse"></div>
+              <span className="text-orange-800 font-medium">You're offline</span>
+              <span className="text-orange-600 ml-2">Some features may not be available</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                fetchDresses();
+                fetchShops();
+              }}
+              className="border-orange-300 text-orange-700 hover:bg-orange-50"
+            >
+              Retry
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Search & Filter Section */}
       <section className="bg-muted/50 py-8">
@@ -337,12 +337,6 @@ const Dresses = () => {
                   ))}
                 </SelectContent>
               </Select>
-
-              {/* More Filters */}
-              <Button className="h-12 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
-                <Filter className="w-4 h-4 mr-2" />
-                More Filters
-              </Button>
             </div>
           </div>
         </div>
@@ -448,13 +442,11 @@ const Dresses = () => {
                           variant="outline"
                           className="flex-1"
                           onClick={() => {
-                            supabase.auth.getSession().then(({ data }) => {
-                              if (!data.session) {
-                                openModal(() => navigate(`/dress/${dress.id}`));
-                              } else {
-                                navigate(`/dress/${dress.id}`);
-                              }
-                            });
+                            if (!user) {
+                              openModal(() => navigate(`/dress/${dress.id}`));
+                            } else {
+                              navigate(`/dress/${dress.id}`);
+                            }
                           }}
                         >
                           <Eye className="w-4 h-4 mr-2" />

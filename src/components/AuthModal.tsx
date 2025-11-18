@@ -10,6 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
+import { verifyEmail } from "@/lib/emailVerification";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -26,6 +27,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess }
 
   const form = useForm<LoginFormData | SignupFormData | ForgotPasswordFormData>({
     resolver: zodResolver(isForgotPassword ? forgotPasswordSchema : isLogin ? loginSchema : signupSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      fullName: "",
+      phone: "",
+    },
   });
 
   const navigateToLanding = () => {
@@ -58,7 +65,13 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess }
           password: loginData.password,
         });
 
-        if (error) throw error;
+        if (error) {
+          if (error.message?.includes("Email not confirmed") || error.message?.includes("Please check your email")) {
+            toast.error("Please check your email and click the confirmation link before signing in.");
+            return;
+          }
+          throw error;
+        }
 
         if (authData.user) {
           let { data: ownerData } = await supabase
@@ -97,10 +110,40 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess }
       }
     } else {
       const signupData = data as SignupFormData;
+
+      // First, verify the email address
+      setIsLoading(true);
       try {
+        const emailVerification = await verifyEmail(signupData.email);
+
+        if (!emailVerification.isValid) {
+          toast.error(emailVerification.message);
+          setIsLoading(false);
+          return;
+        }
+
+        if (emailVerification.isDisposable) {
+          toast.error("Disposable email addresses are not allowed. Please use a valid email address.");
+          setIsLoading(false);
+          return;
+        }
+
+        if (emailVerification.score < 50) {
+          toast.error("Please use a more reliable email address.");
+          setIsLoading(false);
+          return;
+        }
+
+        // Proceed with signup if email is valid
         const { data: authData, error } = await supabase.auth.signUp({
           email: signupData.email,
-          password: signupData.password
+          password: signupData.password,
+          options: {
+            data: {
+              full_name: signupData.fullName || "",
+              phone: signupData.phone || "",
+            }
+          }
         });
 
         if (error) throw error;
@@ -208,10 +251,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess }
                           className="pl-10 rounded-lg border-gray-300 focus:border-primary"
                           disabled={isLoading}
                         />
-                        <svg 
-                          className="absolute left-3 top-3 w-4 h-4 text-gray-400" 
-                          fill="none" 
-                          stroke="currentColor" 
+                        <svg
+                          className="absolute left-3 top-3 w-4 h-4 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
                           viewBox="0 0 24 24"
                         >
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -222,6 +265,47 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess }
                   </FormItem>
                 )}
               />
+            )}
+
+            {!isLogin && !isForgotPassword && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="fullName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-gray-700">Full Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Your full name"
+                          {...field}
+                          className="rounded-lg border-gray-300 focus:border-primary"
+                          disabled={isLoading}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-gray-700">Phone (optional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Your phone number"
+                          {...field}
+                          className="rounded-lg border-gray-300 focus:border-primary"
+                          disabled={isLoading}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
             )}
 
             {/* Primary Button */}

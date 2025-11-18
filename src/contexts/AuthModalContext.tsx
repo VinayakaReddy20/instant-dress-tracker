@@ -37,6 +37,7 @@ export const AuthModalProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuthModal = (): AuthModalContextType => {
   const context = useContext(AuthModalContext);
   if (!context) {

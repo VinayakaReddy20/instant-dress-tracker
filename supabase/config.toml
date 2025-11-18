@@ -1,4 +1,9 @@
 project_id = "xvnyhgbthylvauedesbl"
+
+[auth]
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173/auth/callback"]
+
 [functions.delete-account]
 enabled = true
 verify_jwt = true

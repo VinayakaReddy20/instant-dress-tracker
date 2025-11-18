@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabaseClient";
 import { Tables } from "@/integrations/supabase/types";
 import { calculateDistance } from "@/lib/geolocation";
+import type { ShopWithCount } from "@/types/shared";
 
 export type Shop = Tables<'shops'>;
 
@@ -19,8 +20,8 @@ export interface ShopFilters {
 }
 
 export const useShops = (filters?: ShopFilters) => {
-  const [shops, setShops] = useState<Shop[]>([]);
-  const [filteredShops, setFilteredShops] = useState<Shop[]>([]);
+  const [shops, setShops] = useState<ShopWithCount[]>([]);
+  const [filteredShops, setFilteredShops] = useState<ShopWithCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,12 +32,31 @@ export const useShops = (filters?: ShopFilters) => {
 
       const { data, error: supabaseError } = await supabase
         .from("shops")
-        .select("*")
+        .select(`
+          *,
+          dresses(count)
+        `)
         .order("created_at", { ascending: false });
 
       if (supabaseError) throw new Error(supabaseError.message);
 
-      setShops(data ?? []);
+      if (!data) {
+        setShops([]);
+        return;
+      }
+
+      // Transform to ShopWithCount
+      type ShopQueryResult = Shop & { dresses: { count: number }[] };
+      const transformed: ShopWithCount[] = (data as ShopQueryResult[]).map(
+        (shop) => ({
+          ...shop,
+          dress_count: shop.dresses?.[0]?.count ?? 0,
+          latitude: shop.latitude ?? undefined,
+          longitude: shop.longitude ?? undefined,
+        })
+      );
+
+      setShops(transformed);
     } catch (err) {
       console.error("Error fetching shops:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch shops");
@@ -54,8 +74,8 @@ export const useShops = (filters?: ShopFilters) => {
       const query = filters.searchQuery.toLowerCase();
       filtered = filtered.filter(shop =>
         shop.name.toLowerCase().includes(query) ||
-        shop.location.toLowerCase().includes(query) ||
-        shop.address.toLowerCase().includes(query) ||
+        (shop.location?.toLowerCase() || '').includes(query) ||
+        (shop.address?.toLowerCase() || '').includes(query) ||
         shop.description?.toLowerCase().includes(query) ||
         shop.specialties?.some(specialty => specialty.toLowerCase().includes(query))
       );
@@ -96,7 +116,7 @@ export const useShops = (filters?: ShopFilters) => {
   useEffect(() => {
     fetchShops();
 
-    const channel = supabase
+    const shopsChannel = supabase
       .channel("realtime-shops")
       .on(
         "postgres_changes",
@@ -108,17 +128,33 @@ export const useShops = (filters?: ShopFilters) => {
           switch (payload.eventType) {
             case "INSERT":
               if (newShop) {
+                const shopWithCount: ShopWithCount = {
+                  ...newShop,
+                  dress_count: 0,
+                  latitude: newShop.latitude ?? undefined,
+                  longitude: newShop.longitude ?? undefined,
+                };
                 setShops((prev) =>
                   prev.some((s) => s.id === newShop.id)
                     ? prev
-                    : [newShop, ...prev]
+                    : [shopWithCount, ...prev]
                 );
               }
               break;
             case "UPDATE":
               if (newShop) {
                 setShops((prev) =>
-                  prev.map((s) => (s.id === newShop.id ? newShop : s))
+                  prev.map((s) => {
+                    if (s.id === newShop.id) {
+                      return {
+                        ...s,
+                        ...newShop,
+                        latitude: newShop.latitude ?? undefined,
+                        longitude: newShop.longitude ?? undefined,
+                      };
+                    }
+                    return s;
+                  })
                 );
               }
               break;
@@ -132,8 +168,20 @@ export const useShops = (filters?: ShopFilters) => {
       )
       .subscribe();
 
+    const dressesChannel = supabase
+      .channel("realtime-dresses")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "dresses" },
+        () => {
+          fetchShops(); // Refetch since dress_count depends on dresses
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(shopsChannel);
+      supabase.removeChannel(dressesChannel);
     };
   }, [fetchShops]);
 
