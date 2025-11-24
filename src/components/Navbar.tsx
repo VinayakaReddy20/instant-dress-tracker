@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef, memo } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Store, Search, User, Menu, ShoppingCart, LogOut } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Store, Search, User, Menu, ShoppingCart, LogOut, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import AuthModal from "@/components/AuthModal";
 import CartDrawer from "@/components/CartDrawer";
-import { useCart } from "@/contexts/CartContext";
+import SearchBar from "@/components/SearchBar";
+import { useCart } from "@/contexts/CartTypes";
 import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import { useAuthModal } from "@/contexts/AuthModalContext";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { supabase } from "@/integrations/supabaseClient";
 
 interface NavbarProps {
   onLogin?: () => void; // ✅ allow Dashboard to pass fetchDashboard
@@ -19,13 +21,70 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [shopOwnerUser, setShopOwnerUser] = useState<{ id: string; email?: string } | null>(null);
   const location = useLocation();
+  const navigate = useNavigate();
   const { totalQuantity } = useCart();
   const { user, customerProfile, signOut } = useCustomerAuth();
   const { openModal } = useAuthModal();
   const isMobile = useIsMobile();
 
   const isActive = (path: string) => location.pathname === path;
+
+  // Check if shop owner is logged in
+  useEffect(() => {
+    const checkShopOwnerAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && session.user && session.expires_at && session.expires_at > Date.now() / 1000) {
+        try {
+          const { data: shopOwnerData, error } = await supabase
+            .from("shop_owners")
+            .select("id")
+            .eq("user_id", session.user.id)
+            .maybeSingle();
+
+          if (shopOwnerData && !error) {
+            setShopOwnerUser(session.user);
+          } else {
+            setShopOwnerUser(null);
+          }
+        } catch (error) {
+          setShopOwnerUser(null);
+        }
+      } else {
+        setShopOwnerUser(null);
+      }
+    };
+
+    checkShopOwnerAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user && session.expires_at && session.expires_at > Date.now() / 1000) {
+        try {
+          const { data: shopOwnerData, error } = await supabase
+            .from("shop_owners")
+            .select("id")
+            .eq("user_id", session.user.id)
+            .maybeSingle();
+
+          if (shopOwnerData && !error) {
+            setShopOwnerUser(session.user);
+          } else {
+            setShopOwnerUser(null);
+          }
+        } catch (error) {
+          setShopOwnerUser(null);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setShopOwnerUser(null);
+      } else {
+        setShopOwnerUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleLoginSuccess = (ownerId: string) => {
     console.log("Login successful, owner ID:", ownerId);
@@ -36,6 +95,47 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
 
   const handleCustomerLogin = () => {
     openModal(() => {});
+  };
+
+  const handleSearch = (query: string) => {
+    if (query.trim()) {
+      navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+    }
+  };
+
+  const handleLogout = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    const confirmed = window.confirm("Are you sure you want to log out?");
+    if (confirmed) {
+      console.log("Navbar: Attempting to sign out...");
+
+      if (shopOwnerUser) {
+        try {
+          const { error } = await supabase.auth.signOut({ scope: 'local' });
+          if (error && !error.message?.includes('Invalid Refresh Token')) throw error;
+          console.log("Navbar: Shop owner sign out successful");
+          setShopOwnerUser(null);
+        } catch (error: unknown) {
+          console.error("Navbar: Shop owner logout error:", error);
+          const err = error as { message?: string };
+          if (err.message?.includes('Invalid Refresh Token') || err.message?.includes('Refresh Token Not Found')) {
+            console.warn("Navbar: Refresh token expired, clearing local session");
+            setShopOwnerUser(null);
+          }
+        }
+      } else if (user) {
+        // Customer signOut now handles all clearing internally
+        signOut();
+        console.log("Navbar: Customer sign out initiated");
+      }
+
+      console.log("Navbar: Sign out successful, navigating to home...");
+      setTimeout(() => window.location.href = "/", 100);
+    }
   };
 
   return (
@@ -55,17 +155,10 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
 
             {/* Desktop Menu */}
             <div className="hidden md:flex items-center space-x-4">
-              {onSearch && (
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search dresses, shops, styles..."
-                    className="pl-12 pr-4 py-3 w-80 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-base"
-                    onChange={(e) => onSearch(e.target.value)}
-                  />
-                </div>
-              )}
+              {/* Search Bar */}
+              <div className="w-64">
+                <SearchBar onSearch={handleSearch} showButton={false} />
+              </div>
               <Link
                 to="/shops"
                 className={`px-3 py-2 rounded-md text-sm font-medium ${
@@ -101,7 +194,19 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
                   </Badge>
                 )}
               </Button>
-              {user ? (
+              {shopOwnerUser ? (
+                <div className="flex items-center space-x-4">
+                  <span className="text-gray-700 font-medium">Hello, {shopOwnerUser.email}</span>
+                  <Button
+                    variant="outline"
+                    onClick={handleLogout}
+                    className="flex items-center space-x-1 px-3 py-2 rounded-md"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Logout</span>
+                  </Button>
+                </div>
+              ) : user ? (
                 <div className="flex items-center space-x-4">
                   <span className="text-gray-700 font-medium">Hello, {customerProfile?.full_name || user.email?.split('@')[0]}</span>
                   <Link
@@ -117,7 +222,7 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
                   </Link>
                   <Button
                     variant="outline"
-                    onClick={() => signOut()}
+                    onClick={handleLogout}
                     className="flex items-center space-x-1 px-3 py-2 rounded-md"
                   >
                     <LogOut className="w-4 h-4" />
@@ -161,14 +266,14 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
             <div className="md:hidden mt-2 space-y-1 pb-4 border-t border-gray-200">
               <Link
                 to="/shops"
-                className="block px-4 py-2 rounded-md text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                className="flex items-center space-x-2 px-4 py-2 rounded-md text-gray-700 hover:bg-gray-100"
               >
                 <Store className="w-4 h-4" />
                 <span>Shops</span>
               </Link>
               <Link
                 to="/dresses"
-                className="block px-4 py-2 rounded-md text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                className="flex items-center space-x-2 px-4 py-2 rounded-md text-gray-700 hover:bg-gray-100"
               >
                 <Search className="w-4 h-4" />
                 <span>Dresses</span>
@@ -189,39 +294,62 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
                   </Badge>
                 )}
               </Button>
-              {user ? (
-                <Link
-                  to="/customer-profile"
-                  className="block px-4 py-2 rounded-md text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <User className="w-4 h-4" />
-                  <span>Profile</span>
-                </Link>
-              ) : (
+              {shopOwnerUser ? (
                 <Button
-                  onClick={handleCustomerLogin}
                   variant="outline"
+                  onClick={() => {
+                    handleLogout();
+                    setMobileMenuOpen(false);
+                  }}
                   className="w-full flex items-center justify-center space-x-2 px-4 py-2 rounded-md"
                 >
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout</span>
+                </Button>
+              ) : user ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    handleLogout();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center justify-center space-x-2 px-4 py-2 rounded-md"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout</span>
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => {
+                    setIsAuthModalOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full bg-primary text-white hover:bg-primary-dark flex items-center justify-center space-x-2 px-4 py-2 rounded-md"
+                >
                   <User className="w-4 h-4" />
-                  <span>Customer</span>
+                  <span>Shop Owner</span>
                 </Button>
               )}
-              <Button
-                onClick={() => {
-                  setIsAuthModalOpen(true);
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full bg-primary text-white hover:bg-primary-dark flex items-center justify-center space-x-2 px-4 py-2 rounded-md"
-              >
-                <User className="w-4 h-4" />
-                <span>Shop Owner</span>
-              </Button>
             </div>
           )}
         </div>
       </nav>
+
+      {/* Dashboard Button - Only show if shop owner is logged in and not on dashboard page */}
+      {shopOwnerUser && location.pathname !== "/dashboard" && (
+        <div className="bg-gray-50 border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+            <Button
+              onClick={() => navigate("/dashboard")}
+              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white"
+              variant="default"
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Dashboard</span>
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Auth Modal */}
       {isAuthModalOpen && (

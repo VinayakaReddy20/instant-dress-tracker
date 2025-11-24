@@ -249,8 +249,8 @@ export default function Dashboard() {
 
   // ----- DELETE SHOP -----
   const handleDeleteShop = async () => {
-    if (!shop) return;
-    if (!confirm("Are you sure you want to delete this shop? This will delete all dresses, shop data, and your account as well.")) return;
+    if (!shop || !ownerId) return;
+    if (!confirm("Are you sure you want to delete this shop? This will delete all dresses and your shop owner account as well.")) return;
     try {
       // Delete dresses first
       const { error: dressesError } = await supabase
@@ -266,28 +266,18 @@ export default function Dashboard() {
         .eq("id", shop.id);
       if (shopError) throw shopError;
 
-      // Delete shop_owner record to prevent recreation
-      if (shop.owner_id) {
-        const { error: ownerError } = await supabase
-          .from("shop_owners")
-          .delete()
-          .eq("id", shop.owner_id);
-        if (ownerError) throw ownerError;
-      }
-
-      // Delete customer record if it exists
-      const { error: customerError } = await supabase
-        .from("customers")
+      // Delete shop owner profile
+      const { error: ownerError } = await supabase
+        .from("shop_owners")
         .delete()
         .eq("user_id", ownerId);
-      if (customerError) {
-        console.error("Error deleting customer record:", customerError);
-        // Continue with sign out even if customer deletion fails
-      }
+      if (ownerError) throw ownerError;
 
-      // Sign out the user since their account is deleted
+      // Sign out the user
       await supabase.auth.signOut();
-      navigate("/");
+
+      setShop(null);
+      setError("Shop deleted successfully.");
     } catch (err) {
       console.error(err);
       alert("Failed to delete shop.");
@@ -307,6 +297,8 @@ export default function Dashboard() {
   }
 
   if (error || !shop) {
+    const isShopDeleted = error === "Shop deleted successfully.";
+
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-gray-50">
         <Card className="w-[380px] shadow-lg border border-gray-200">
@@ -317,13 +309,16 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="text-center">
             <p className="text-gray-600 mb-4">
-              You don't have a shop linked to this account.
+              {isShopDeleted
+                ? "Your shop has been successfully deleted."
+                : "You don't have a shop linked to this account."
+              }
             </p>
             <Button
               className="w-full bg-blue-600 hover:bg-blue-700"
-              onClick={handleCreateShop}
+              onClick={isShopDeleted ? () => navigate("/") : handleCreateShop}
             >
-              + Create My Shop
+              {isShopDeleted ? "Back to Home Page" : "+ Create My Shop"}
             </Button>
           </CardContent>
         </Card>
@@ -343,22 +338,12 @@ export default function Dashboard() {
       <Navbar />
       <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Store className="w-8 h-8 text-blue-600" />
-              {shop.name} Dashboard
-            </h1>
-            <p className="text-gray-600 mt-1">Manage your e-commerce store</p>
-          </div>
-          <Button
-            variant="outline"
-            onClick={handleLogout}
-            className="flex items-center gap-2"
-          >
-            <LogOut className="w-4 h-4" />
-            Logout
-          </Button>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Store className="w-8 h-8 text-blue-600" />
+            {shop.name} Dashboard
+          </h1>
+          <p className="text-gray-600 mt-1">Manage your e-commerce store</p>
         </div>
 
         {/* Tabs */}
@@ -581,7 +566,7 @@ export default function Dashboard() {
                       phone: shop.phone ?? "",
                       business_name: shop.business_name ?? "",
                       hours: shop.hours ?? "",
-                      specialties: shop.specialties ?? [],
+                      specialties: shop.specialties?.join(", ") ?? "",
                     }}
                     onSave={handleShopFormSave}
                     onCancel={handleShopFormCancel}

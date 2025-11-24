@@ -2,8 +2,9 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabaseClient";
-import { useCart } from "@/contexts/CartContext";
+import { useCart } from "@/contexts/CartTypes";
 import { useAuthModal } from "@/contexts/AuthModalContext";
+import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -15,18 +16,18 @@ interface DressDetailType {
   id: string;
   shop_id: string;
   name: string;
-  price: number;
+  price: number | null;
   stock: number | null;
   size: string;
-  color: string;
-  category: string;
+  color: string | null;
+  category: string | null;
   image_url: string | null;
   description: string | null;
   material: string | null;
   brand: string | null;
   created_at: string;
   updated_at: string;
-  shops: { name: string; location: string } | null;
+  shops: { name: string; location: string | null } | null;
 }
 
 const DressDetail = () => {
@@ -65,30 +66,37 @@ const DressDetail = () => {
 
   // Customer authentication check for addToCart
   const { openModal } = useAuthModal();
+  const { user } = useCustomerAuth();
 
   const handleAddToCart = () => {
     if (!dress) return;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) {
-        openModal(() => handleAddToCart());
-      } else {
-        addToCart({
-          id: dress.id,
-          name: dress.name,
-          price: dress.price,
-          size: dress.size,
-          color: dress.color || undefined,
-          category: dress.category || undefined,
-          image_url: dress.image_url || undefined,
-          shop_id: dress.shop_id,
-          shop: dress.shops ? { name: dress.shops.name, location: dress.shops.location } : undefined
-        });
-        toast({
-          title: "Added to cart!",
-          description: `${dress.name} has been added to your cart.`,
-        });
-      }
-    });
+    if (!dress.stock || dress.stock <= 0) {
+      toast({
+        title: "Out of Stock",
+        description: "This dress is currently out of stock and cannot be added to your cart.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!user) {
+      openModal(() => handleAddToCart());
+    } else {
+      addToCart({
+        id: dress.id,
+        name: dress.name,
+        price: dress.price,
+        size: dress.size,
+        color: dress.color || undefined,
+        category: dress.category || undefined,
+        image_url: dress.image_url || undefined,
+        shop_id: dress.shop_id,
+        shop: dress.shops ? { name: dress.shops.name, location: dress.shops.location || "" } : undefined
+      });
+      toast({
+        title: "Added to cart!",
+        description: `${dress.name} has been added to your cart.`,
+      });
+    }
   };
 
   if (loading) {
@@ -132,7 +140,7 @@ const DressDetail = () => {
             <h1 className="text-3xl font-bold">{dress.name}</h1>
             <div className="flex items-center space-x-4">
               <span className="text-2xl font-semibold text-primary">
-                ₹{dress.price.toLocaleString("en-IN")}
+                {dress.price ? `₹${dress.price.toLocaleString("en-IN")}` : "Price not available"}
               </span>
               {dress.stock && dress.stock > 0 ? (
                 <Badge variant="default">{dress.stock} in stock</Badge>
@@ -142,8 +150,8 @@ const DressDetail = () => {
             </div>
             <div className="space-y-1">
               <p><strong>Size:</strong> {dress.size}</p>
-              <p><strong>Color:</strong> {dress.color}</p>
-              <p><strong>Category:</strong> {dress.category}</p>
+              <p><strong>Color:</strong> {dress.color || "Not specified"}</p>
+              <p><strong>Category:</strong> {dress.category || "Not specified"}</p>
               {dress.material && <p><strong>Material:</strong> {dress.material}</p>}
               {dress.brand && <p><strong>Brand:</strong> {dress.brand}</p>}
               {dress.description && (
@@ -153,10 +161,10 @@ const DressDetail = () => {
             <Button
               className="w-full"
               onClick={handleAddToCart}
-              disabled={!dress.stock || dress.stock <= 0}
+              disabled={!dress.stock || dress.stock <= 0 || !dress.price}
             >
               <ShoppingCart className="w-4 h-4 mr-2" />
-              {dress.stock && dress.stock > 0 ? "Add to Cart" : "Out of Stock"}
+              {!dress.price ? "Price not available" : dress.stock && dress.stock > 0 ? "Add to Cart" : "Out of Stock"}
             </Button>
           </div>
         </div>

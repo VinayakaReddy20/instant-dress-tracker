@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { supabase } from "@/integrations/supabaseClient";
 import { shopFormSchema, type ShopFormData as ValidatedShopFormData } from "@/lib/validations";
-import { getCurrentLocation, reverseGeocode } from "@/lib/geolocation";
+import { getCurrentLocation, reverseGeocodeWithFallback, getCurrentLocationWithAccuracy, isLocationAccurate, getAccuracyDescription } from "@/lib/geolocation";
 import Map from "@/components/Map";
 import { validateAddress } from "@/lib/googleMaps";
 
@@ -32,7 +32,7 @@ const ShopEditForm: React.FC<ShopEditFormProps> = ({ initialData, onSave, onCanc
       address: initialData.address,
       phone: initialData.phone,
       hours: initialData.hours,
-      specialties: initialData.specialties || [],
+      specialties: initialData.specialties || "",
       description: initialData.description,
       image_url: initialData.image_url,
     },
@@ -107,26 +107,46 @@ const ShopEditForm: React.FC<ShopEditFormProps> = ({ initialData, onSave, onCanc
   const handleUseCurrentLocation = async () => {
     setLocationLoading(true);
     try {
-      const location = await getCurrentLocation();
-      if (location) {
-        // Get the address from coordinates using reverse geocoding
-        const address = await reverseGeocode(location.latitude, location.longitude);
+      const locationResult = await getCurrentLocationWithAccuracy();
+      if (locationResult) {
+        const { coordinates, accuracy, source } = locationResult;
+
+        // Check if accuracy is acceptable
+        const isAccurate = isLocationAccurate(accuracy);
+        const accuracyDesc = getAccuracyDescription(accuracy);
+
+        // Get detailed address information
+        const addressInfo = await reverseGeocodeWithFallback(
+          coordinates.latitude,
+          coordinates.longitude
+        );
 
         // Update form state with coordinates and address
-        form.setValue("latitude", location.latitude);
-        form.setValue("longitude", location.longitude);
-        if (address) {
-          form.setValue("address", address);
-          setAddressValid(true); // GPS addresses are typically valid
+        form.setValue("latitude", coordinates.latitude);
+        form.setValue("longitude", coordinates.longitude);
+
+        // Use the most complete address available
+        const fullAddress = addressInfo.address ||
+          `${addressInfo.city || ''}, ${addressInfo.state || ''} ${addressInfo.postalCode || ''}`.trim();
+
+        if (fullAddress) {
+          form.setValue("address", fullAddress);
+          setAddressValid(true);
         }
 
-        alert('Location captured successfully! Click "Update Details" to save.');
+        // Provide detailed feedback to user
+        const accuracyMessage = isAccurate
+          ? `Location captured successfully! (${accuracyDesc})`
+          : `Location captured, but accuracy is ${accuracyDesc.toLowerCase()}. Consider verifying the address.`;
+
+        alert(`${accuracyMessage}\n\nAccuracy: ±${Math.round(accuracy)}m\nSource: ${source}\n\nClick "Update Details" to save.`);
+
       } else {
-        alert('Unable to get your location. Please check your browser permissions.');
+        alert('Unable to get your location. Please check your browser permissions and try again. For laptops, ensure WiFi is enabled for better positioning.');
       }
     } catch (error) {
       console.error('Error updating location:', error);
-      alert('Failed to update location. Please try again.');
+      alert('Failed to update location. Please try again or enter address manually.');
     } finally {
       setLocationLoading(false);
     }
@@ -216,7 +236,7 @@ const ShopEditForm: React.FC<ShopEditFormProps> = ({ initialData, onSave, onCanc
         address: data.address,
         phone: data.phone || null,
         ...(data.hours && { hours: data.hours }),
-        specialties: data.specialties || null,
+        specialties: data.specialties ? data.specialties.split(",").map(s => s.trim()).filter(s => s) : null,
         description: data.description || null,
         image_url: data.image_url || null,
         // Include coordinates if they were updated
@@ -402,10 +422,7 @@ const ShopEditForm: React.FC<ShopEditFormProps> = ({ initialData, onSave, onCanc
                     <FormControl>
                       <Input
                         placeholder="e.g. Bridal, Casual, Party Wear"
-                        value={field.value ? field.value.join(", ") : ""}
-                        onChange={(e) =>
-                          field.onChange(e.target.value.split(",").map((s) => s.trim()))
-                        }
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />

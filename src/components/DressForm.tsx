@@ -34,7 +34,7 @@ const DressForm: React.FC<DressFormProps> = ({
     resolver: zodResolver(dressFormSchema),
     defaultValues: {
       name: "",
-      price: 0,
+      price: initialData?.price ?? 10,
       size: "",
       color: "",
       category: "",
@@ -54,13 +54,14 @@ const DressForm: React.FC<DressFormProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const onSubmit = async (data: DressFormData) => {
-    const submitData = { ...data, shop_id: shopId };
+    const { id, ...formData } = data;
+    const submitData = { ...formData, shop_id: shopId };
     try {
-      if (data.id) {
+      if (initialData?.id) {
         const { error } = await supabase
           .from("dresses")
           .update(submitData)
-          .eq("id", data.id);
+          .eq("id", initialData.id);
         if (error) throw error;
       } else {
         const { error } = await supabase.from("dresses").insert(submitData);
@@ -211,7 +212,7 @@ const DressForm: React.FC<DressFormProps> = ({
                 type="number"
                 {...register("price", { valueAsNumber: true })}
                 placeholder="1999"
-                min={0}
+                min={10}
                 step={0.01}
                 aria-invalid={errors.price ? "true" : "false"}
               />

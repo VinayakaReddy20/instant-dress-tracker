@@ -20,7 +20,8 @@ import {
 import { supabase } from "@/integrations/supabaseClient";
 import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import Navbar from "@/components/Navbar";
-import { getCurrentLocation, reverseGeocode } from "@/lib/geolocation";
+import { getCurrentLocation, reverseGeocodeWithFallback, getCurrentLocationWithAccuracy, isLocationAccurate, getAccuracyDescription } from "@/lib/geolocation";
+import { customerProfileSchema, changePasswordSchema, type CustomerProfileFormData, type ChangePasswordFormData } from "@/lib/validations";
 import {
   User,
   Mail,
@@ -33,7 +34,6 @@ import {
   Edit,
   Save,
   X,
-  Camera,
   MapPinIcon,
 } from "lucide-react";
 
@@ -46,18 +46,14 @@ interface CustomerProfile {
   created_at: string;
   updated_at: string;
   address: string | null;
-  city: string | null;
-  pincode: string | null;
-  latitude?: number;
-  longitude?: number;
-  profile_picture_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export default function CustomerProfile() {
   const { user, signOut } = useCustomerAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,8 +62,6 @@ export default function CustomerProfile() {
     full_name: "",
     phone: "",
     address: "",
-    city: "",
-    pincode: "",
   });
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordData, setPasswordData] = useState({
@@ -75,7 +69,6 @@ export default function CustomerProfile() {
     new: "",
     confirm: "",
   });
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [enablingLocation, setEnablingLocation] = useState(false);
   const [updatingProfile, setUpdatingProfile] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -88,7 +81,7 @@ export default function CustomerProfile() {
       try {
         const { data, error } = await supabase
           .from("customers")
-          .select("*")
+          .select("id, user_id, email, full_name, phone, created_at, updated_at, address, latitude, longitude")
           .eq("user_id", user.id)
           .single();
 
@@ -99,8 +92,6 @@ export default function CustomerProfile() {
           full_name: data.full_name || "",
           phone: data.phone || "",
           address: data.address || "",
-          city: data.city || "",
-          pincode: data.pincode || "",
         });
       } catch (error) {
         console.error("Error fetching profile:", error);
@@ -117,83 +108,6 @@ export default function CustomerProfile() {
     fetchProfile();
   }, [user, toast]);
 
-  // Handle profile picture upload
-  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !profile) return;
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast({
-        title: "Error",
-        description: "Please select an image file.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validate file size (2MB max)
-    if (file.size > 2 * 1024 * 1024) {
-      toast({
-        title: "Error",
-        description: "File size must be less than 2MB.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setUploadingPhoto(true);
-
-    try {
-      // Upload to Supabase storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${profile.id}_${Date.now()}.${fileExt}`;
-      const filePath = `profile-pictures/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('profile-pictures')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('profile-pictures')
-        .getPublicUrl(filePath);
-
-      // Update profile in database
-      const { error: updateError } = await supabase
-        .from("customers")
-        .update({
-          profile_picture_url: publicUrl,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", profile.id);
-
-      if (updateError) throw updateError;
-
-      // Update local state
-      setProfile({
-        ...profile,
-        profile_picture_url: publicUrl,
-        updated_at: new Date().toISOString(),
-      });
-
-      toast({
-        title: "Success",
-        description: "Profile picture updated successfully.",
-      });
-    } catch (error) {
-      console.error("Error uploading photo:", error);
-      toast({
-        title: "Error",
-        description: "Failed to upload profile picture.",
-        variant: "destructive",
-      });
-    } finally {
-      setUploadingPhoto(false);
-    }
-  };
 
   // Handle enable location
   const handleEnableLocation = async () => {
@@ -202,50 +116,79 @@ export default function CustomerProfile() {
     setEnablingLocation(true);
 
     try {
-      const location = await getCurrentLocation();
-      if (!location) {
+      const locationResult = await getCurrentLocationWithAccuracy();
+      if (!locationResult) {
         toast({
           title: "Error",
-          description: "Unable to get your location. Please check your browser permissions.",
+          description: "Unable to get your location. Please check your browser permissions and ensure WiFi is enabled for better positioning.",
           variant: "destructive",
         });
         return;
       }
 
-      // Reverse geocode to get address
-      const address = await reverseGeocode(location.latitude, location.longitude);
-      if (!address) {
+      const { coordinates, accuracy, source } = locationResult;
+
+      // Reverse geocode to get detailed address information
+      const addressInfo = await reverseGeocodeWithFallback(
+        coordinates.latitude,
+        coordinates.longitude
+      );
+
+      if (!addressInfo.address && !addressInfo.city) {
         toast({
           title: "Error",
-          description: "Unable to determine address from location.",
+          description: "Unable to determine address from location coordinates.",
           variant: "destructive",
         });
         return;
       }
 
-      // Parse address to extract city and pincode (basic parsing)
-      const addressParts = address.split(',');
-      const city = addressParts[addressParts.length - 3]?.trim() || '';
-      const pincodeMatch = address.match(/\b\d{6}\b/);
-      const pincode = pincodeMatch ? pincodeMatch[0] : '';
+      // Create a comprehensive address string
+      const addressParts = [
+        addressInfo.address,
+        addressInfo.city && addressInfo.city !== addressInfo.address?.split(',')[0] ? addressInfo.city : null,
+        addressInfo.state,
+        addressInfo.postalCode,
+        addressInfo.country
+      ].filter(Boolean);
 
-      // Update form data
+      const fullAddress = addressParts.join(', ');
+
+      // Update form data with address and coordinates
       setFormData({
         ...formData,
-        address: address,
-        city: city,
-        pincode: pincode,
+        address: fullAddress,
       });
+
+      // Update profile with coordinates (will be saved when form is submitted)
+      setProfile(prev => prev ? {
+        ...prev,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+      } : null);
+
+      const accuracyDesc = getAccuracyDescription(accuracy);
+      const isAccurate = isLocationAccurate(accuracy);
 
       toast({
         title: "Success",
-        description: "Location detected and address filled automatically.",
+        description: `Location detected and address filled automatically. ${accuracyDesc} (±${Math.round(accuracy)}m, ${source})`,
+        variant: isAccurate ? "default" : "destructive",
       });
+
+      if (!isAccurate) {
+        toast({
+          title: "Accuracy Notice",
+          description: "Location accuracy is lower than ideal. You can manually adjust the address if needed.",
+          variant: "destructive",
+        });
+      }
+
     } catch (error) {
       console.error("Error getting location:", error);
       toast({
         title: "Error",
-        description: "Failed to get location.",
+        description: "Failed to get location. Please try again or enter address manually.",
         variant: "destructive",
       });
     } finally {
@@ -257,17 +200,27 @@ export default function CustomerProfile() {
   const handleUpdateProfile = async () => {
     if (!profile || updatingProfile) return;
 
+    // Validate form data
+    const validation = customerProfileSchema.safeParse(formData);
+    if (!validation.success) {
+      const errorMessages = validation.error.errors.map(err => err.message).join('\n');
+      toast({
+        title: "Validation Error",
+        description: errorMessages,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setUpdatingProfile(true);
 
     try {
       const { error } = await supabase
         .from("customers")
         .update({
-          full_name: formData.full_name,
-          phone: formData.phone,
-          address: formData.address,
-          city: formData.city,
-          pincode: formData.pincode,
+          full_name: validation.data.full_name,
+          phone: validation.data.phone || null,
+          address: validation.data.address,
           latitude: profile.latitude,
           longitude: profile.longitude,
           updated_at: new Date().toISOString(),
@@ -278,11 +231,9 @@ export default function CustomerProfile() {
 
       setProfile({
         ...profile,
-        full_name: formData.full_name,
-        phone: formData.phone,
-        address: formData.address,
-        city: formData.city,
-        pincode: formData.pincode,
+        full_name: validation.data.full_name,
+        phone: validation.data.phone || null,
+        address: validation.data.address,
         updated_at: new Date().toISOString(),
       });
 
@@ -305,10 +256,13 @@ export default function CustomerProfile() {
 
   // Handle password change
   const handleChangePassword = async () => {
-    if (passwordData.new !== passwordData.confirm) {
+    // Validate password data
+    const validation = changePasswordSchema.safeParse(passwordData);
+    if (!validation.success) {
+      const errorMessages = validation.error.errors.map(err => err.message).join('\n');
       toast({
-        title: "Error",
-        description: "New passwords do not match.",
+        title: "Validation Error",
+        description: errorMessages,
         variant: "destructive",
       });
       return;
@@ -316,7 +270,7 @@ export default function CustomerProfile() {
 
     try {
       const { error } = await supabase.auth.updateUser({
-        password: passwordData.new,
+        password: validation.data.new,
       });
 
       if (error) throw error;
@@ -452,36 +406,6 @@ export default function CustomerProfile() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Profile Photo */}
-                <div className="flex items-center gap-4">
-                  <Avatar className="w-20 h-20">
-                    <AvatarImage src={profile.profile_picture_url || ""} />
-                    <AvatarFallback>
-                      {profile.full_name?.charAt(0)?.toUpperCase() || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handlePhotoUpload}
-                      accept="image/*"
-                      className="hidden"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploadingPhoto}
-                    >
-                      <Camera className="w-4 h-4 mr-2" />
-                      {uploadingPhoto ? "Uploading..." : "Change Photo"}
-                    </Button>
-                    <p className="text-sm text-gray-500 mt-1">
-                      JPG, PNG or GIF. Max size 2MB.
-                    </p>
-                  </div>
-                </div>
 
                 <Separator />
 
@@ -563,8 +487,8 @@ export default function CustomerProfile() {
                       </Button>
                     )}
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2 md:col-span-2">
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-2">
                       <Label htmlFor="address">Address</Label>
                       {editing ? (
                         <Input
@@ -578,42 +502,6 @@ export default function CustomerProfile() {
                       ) : (
                         <p className="text-sm text-gray-600">
                           {profile.address || "Not provided"}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="city">City</Label>
-                      {editing ? (
-                        <Input
-                          id="city"
-                          value={formData.city}
-                          onChange={(e) =>
-                            setFormData({ ...formData, city: e.target.value })
-                          }
-                          placeholder="Enter your city"
-                        />
-                      ) : (
-                        <p className="text-sm text-gray-600">
-                          {profile.city || "Not provided"}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="pincode">Pincode</Label>
-                      {editing ? (
-                        <Input
-                          id="pincode"
-                          value={formData.pincode}
-                          onChange={(e) =>
-                            setFormData({ ...formData, pincode: e.target.value })
-                          }
-                          placeholder="Enter your pincode"
-                        />
-                      ) : (
-                        <p className="text-sm text-gray-600">
-                          {profile.pincode || "Not provided"}
                         </p>
                       )}
                     </div>
@@ -635,8 +523,6 @@ export default function CustomerProfile() {
                           full_name: profile.full_name || "",
                           phone: profile.phone || "",
                           address: profile.address || "",
-                          city: profile.city || "",
-                          pincode: profile.pincode || "",
                         });
                       }}
                     >

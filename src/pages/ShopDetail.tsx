@@ -1,18 +1,19 @@
 // src/pages/ShopDetail.tsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { MapPin, Phone, Clock, Star, Package, ShoppingCart, Navigation, Loader2 } from "lucide-react";
+import { MapPin, Phone, Clock, Star, Package, ShoppingCart, Navigation, Loader2, ChevronLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabaseClient";
 import { Tables } from "@/integrations/supabase/types";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useCart } from "@/contexts/CartContext";
+import { useCart } from "@/contexts/CartTypes";
 import { useAuthModal } from "@/contexts/AuthModalContext";
+import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import { useToast } from "@/components/ui/use-toast";
 import Map from "@/components/Map";
-import { getCurrentLocation, reverseGeocode } from "@/lib/geolocation";
+import { getCurrentLocation, reverseGeocodeWithFallback, getCurrentLocationWithAccuracy, isLocationAccurate, getAccuracyDescription } from "@/lib/geolocation";
 
 type Shop = Tables<'shops'>;
 type Dress = Tables<'dresses'>;
@@ -23,6 +24,7 @@ const ShopDetail = () => {
   const { toast } = useToast();
   const { addToCart } = useCart();
   const { openModal } = useAuthModal();
+  const { user } = useCustomerAuth();
 
   const [shop, setShop] = useState<Shop | null>(null);
   const [dresses, setDresses] = useState<Dress[]>([]);
@@ -85,6 +87,18 @@ const ShopDetail = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+
+      {/* Back to Home Button */}
+      <div className="max-w-5xl mx-auto px-4 pt-6">
+        <Button
+          variant="outline"
+          className="flex items-center gap-2 text-primary border-primary hover:bg-primary/10"
+          onClick={() => navigate("/")}
+        >
+          <ChevronLeft className="w-4 h-4" />
+          Back to Home
+        </Button>
+      </div>
 
       {/* Shop Banner */}
       <div className="relative h-72 md:h-96 w-full overflow-hidden">
@@ -195,25 +209,46 @@ const ShopDetail = () => {
                 onClick={async () => {
                   setLocationLoading(true);
                   try {
-                    const location = await getCurrentLocation();
-                    if (location && shop.latitude && shop.longitude) {
+                    const locationResult = await getCurrentLocationWithAccuracy();
+                    if (locationResult && shop.latitude && shop.longitude) {
+                      const { coordinates, accuracy, source } = locationResult;
                       const shopLat = shop.latitude;
                       const shopLng = shop.longitude;
-                      const userLat = location.latitude;
-                      const userLng = location.longitude;
+                      const userLat = coordinates.latitude;
+                      const userLng = coordinates.longitude;
 
                       // Open Google Maps with directions
                       const url = `https://www.google.com/maps/dir/${userLat},${userLng}/${shopLat},${shopLng}`;
-                      window.open(url, '_blank');
+                      const newWindow = window.open(url, '_blank');
+                      if (!newWindow) {
+                        toast({
+                          title: "Popup blocked",
+                          description: "Please allow popups for this site to open Google Maps.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+
+                      const accuracyDesc = getAccuracyDescription(accuracy);
+                      const isAccurate = isLocationAccurate(accuracy);
 
                       toast({
                         title: "Opening directions",
-                        description: "Google Maps will open with directions to this shop.",
+                        description: `Google Maps opened with directions to ${shop.name}. Your location accuracy: ${accuracyDesc} (±${Math.round(accuracy)}m, ${source}).`,
+                        variant: isAccurate ? "default" : "destructive",
                       });
+
+                      if (!isAccurate) {
+                        toast({
+                          title: "Accuracy Notice",
+                          description: "Your location accuracy is lower than ideal. Directions may not be perfectly accurate.",
+                          variant: "destructive",
+                        });
+                      }
                     } else {
                       toast({
                         title: "Location error",
-                        description: "Unable to get your location. Please check your browser permissions.",
+                        description: "Unable to get your location. Please check your browser permissions and ensure WiFi is enabled for better positioning on laptops.",
                         variant: "destructive",
                       });
                     }
@@ -221,7 +256,7 @@ const ShopDetail = () => {
                     console.error('Error getting location:', error);
                     toast({
                       title: "Location error",
-                      description: "Failed to get your location. Please try again.",
+                      description: "Failed to get your location. Please try again or check your internet connection.",
                       variant: "destructive",
                     });
                   } finally {
@@ -283,6 +318,14 @@ const ShopDetail = () => {
                     <Button
                       className="flex-1 bg-gradient-to-r from-primary to-primary/80 text-white hover:from-primary/90 hover:to-primary/70"
                       onClick={() => {
+                        if (!dress.stock || dress.stock <= 0) {
+                          toast({
+                            title: "Out of Stock",
+                            description: "This dress is currently out of stock and cannot be added to your cart.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
                         addToCart({
                           id: dress.id,
                           name: dress.name,
@@ -303,13 +346,11 @@ const ShopDetail = () => {
                       variant="outline"
                       className="flex-1"
                       onClick={() => {
-                        supabase.auth.getSession().then(({ data }) => {
-                          if (!data.session) {
-                            openModal(() => navigate(`/dress/${dress.id}`));
-                          } else {
-                            navigate(`/dress/${dress.id}`);
-                          }
-                        });
+                        if (!user) {
+                          openModal(() => navigate(`/dress/${dress.id}`));
+                        } else {
+                          navigate(`/dress/${dress.id}`);
+                        }
                       }}
                     >
                       View Details

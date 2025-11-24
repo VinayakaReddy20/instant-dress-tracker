@@ -9,10 +9,10 @@ export interface Dress extends DressRow {
   shops: Pick<ShopRow, "name" | "location"> | null;
 }
 
-export interface ShopWithCount extends ShopRow {
+export interface ShopWithCount extends Omit<ShopRow, 'latitude' | 'longitude'> {
   dress_count: number;
-  latitude?: number;
-  longitude?: number;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 // Re-export Database type for convenience

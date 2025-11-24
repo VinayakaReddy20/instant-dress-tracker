@@ -1,89 +1,77 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MapPin, Star, Package, Phone, Clock, ArrowLeft, Search } from "lucide-react";
+import { MapPin, Star, Package, Phone, Clock, ArrowLeft, Search, Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Navbar from "@/components/Navbar";
-import { supabase } from "@/integrations/supabaseClient";
 import { useAuthModal } from "@/contexts/AuthModalContext";
+import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useShops } from "@/hooks/useShops";
+import { getCurrentLocation, getCurrentLocationWithAccuracy, isLocationAccurate, getAccuracyDescription } from "@/lib/geolocation";
 import type { ShopWithCount } from "@/types/shared";
 
 const Shops = () => {
   const navigate = useNavigate();
   const { openModal } = useAuthModal();
+  const { user } = useCustomerAuth();
   const isMobile = useIsMobile();
-  const [shops, setShops] = useState<ShopWithCount[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSpecialty, setSelectedSpecialty] = useState("");
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [maxDistance, setMaxDistance] = useState<number | null>(null);
+  const [locationLoading, setLocationLoading] = useState(false);
 
+  const filters = {
+    searchQuery: searchQuery || undefined,
+    specialty: selectedSpecialty || undefined,
+    location: userLocation && maxDistance ? {
+      latitude: userLocation.latitude,
+      longitude: userLocation.longitude,
+      maxDistance,
+    } : undefined,
+  };
 
-  // Fetch shops with dress counts in one query
-  // Fetch shops with dress counts in one query
-  const fetchShops = async () => {
+  const { shops, loading, error, refresh } = useShops(filters);
+
+  const handleGetCurrentLocation = async () => {
+    setLocationLoading(true);
     try {
-      setLoading(true);
-      setError(null);
+      const locationResult = await getCurrentLocationWithAccuracy();
+      if (locationResult) {
+        const { coordinates, accuracy, source } = locationResult;
+        setUserLocation({ latitude: coordinates.latitude, longitude: coordinates.longitude });
+        if (!maxDistance) setMaxDistance(25); // Default to 25km if not set
 
-      const { data, error } = await supabase
-        .from("shops")
-        .select(
-          `
-          *,
-          dresses(count)
-        `
-        );
+        const accuracyDesc = getAccuracyDescription(accuracy);
+        const isAccurate = isLocationAccurate(accuracy);
 
-      if (error) throw error;
+        // Could show a toast here if needed
+        console.log(`Location captured: ${accuracyDesc} (±${Math.round(accuracy)}m, ${source})`);
 
-      if (!data) {
-        setShops([]);
-        return;
+        if (!isAccurate) {
+          console.warn(`Location accuracy is ${accuracyDesc.toLowerCase()}. Results may be less accurate.`);
+        }
+      } else {
+        console.error("Unable to get location for filtering");
+        // Could show user feedback here
       }
-
-      // Explicit type: each row = ShopRow + dresses: { count: number }[]
-      type ShopQueryResult = import("@/types/shared").ShopRow & { dresses: { count: number }[] };
-
-      const transformed: ShopWithCount[] = (data as ShopQueryResult[]).map(
-        (shop) => ({
-          ...shop,
-          dress_count: shop.dresses?.[0]?.count ?? 0,
-        })
-      );
-
-      setShops(transformed);
-    } catch (err: unknown) {
-      console.error("Error fetching shops:", err);
-      setError(err instanceof Error ? err.message : "Failed to load shops.");
+    } catch (err) {
+      console.error("Error getting location:", err);
+      // Could show user feedback here
     } finally {
-      setLoading(false);
+      setLocationLoading(false);
     }
   };
 
-  // Fetch shops with real-time updates
-  useEffect(() => {
-    fetchShops();
-    const shopsChannel = supabase
-      .channel('shops_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shops' }, () => {
-        fetchShops();
-      })
-      .subscribe();
-    const dressesChannel = supabase
-      .channel('dresses_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'dresses' }, () => {
-        fetchShops(); // Refetch shops since dress_count depends on dresses
-      })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(shopsChannel);
-      supabase.removeChannel(dressesChannel);
-    };
-  }, []);
+  const clearLocationFilter = () => {
+    setUserLocation(null);
+    setMaxDistance(null);
+  };
+
+
 
   if (error) {
     return (
@@ -94,7 +82,7 @@ const Shops = () => {
             Error Loading Shops
           </h2>
           <p className="text-muted-foreground mt-2">{error}</p>
-          <Button onClick={fetchShops} className="mt-4">
+          <Button onClick={refresh} className="mt-4">
             Try Again
           </Button>
         </div>
@@ -159,6 +147,45 @@ const Shops = () => {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="flex gap-2 w-full">
+                <Button
+                  variant={userLocation ? "default" : "outline"}
+                  onClick={handleGetCurrentLocation}
+                  disabled={locationLoading}
+                  className="flex items-center gap-2 flex-shrink-0"
+                >
+                  <Navigation className="w-4 h-4" />
+                  {locationLoading ? "Getting..." : userLocation ? "Near Me" : "Use Location"}
+                </Button>
+
+                {userLocation && (
+                  <>
+                    <Select
+                      onValueChange={(value) => setMaxDistance(value ? parseInt(value) : null)}
+                      value={maxDistance?.toString() || ""}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue placeholder="Distance" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5 km</SelectItem>
+                        <SelectItem value="10">10 km</SelectItem>
+                        <SelectItem value="25">25 km</SelectItem>
+                        <SelectItem value="50">50 km</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Button
+                      variant="ghost"
+                      onClick={clearLocationFilter}
+                      className="flex-shrink-0"
+                    >
+                      Clear
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -175,28 +202,7 @@ const Shops = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {shops
-                .filter((shop) =>
-                  shop.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  (shop.location?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-                  (shop.address?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-                  shop.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  shop.specialties?.some(specialty => specialty.toLowerCase().includes(searchQuery.toLowerCase()))
-                )
-                .filter((shop) =>
-                  selectedSpecialty
-                    ? shop.specialties?.includes(selectedSpecialty)
-                    : true
-                )
-                .filter((shop) => {
-                  // Distance filtering removed - latitude/longitude no longer available
-                  return true;
-                })
-                .sort((a, b) => {
-                  // Distance sorting removed - latitude/longitude no longer available
-                  return 0;
-                })
-                .map((shop) => (
+              {shops.map((shop) => (
                   <div
                     key={shop.id}
                     className="border rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow transform hover:scale-105"
@@ -277,13 +283,11 @@ const Shops = () => {
                       <Button
                         className="w-full"
                         onClick={() => {
-                          supabase.auth.getSession().then(({ data }) => {
-                            if (!data.session) {
-                              openModal(() => navigate(`/shop/${shop.id}`));
-                            } else {
-                              navigate(`/shop/${shop.id}`);
-                            }
-                          });
+                          if (!user) {
+                            openModal(() => navigate(`/shop/${shop.id}`));
+                          } else {
+                            navigate(`/shop/${shop.id}`);
+                          }
                         }}
                       >
                         Visit Shop

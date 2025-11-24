@@ -3,7 +3,7 @@ import { ShoppingCart, X, Plus, Minus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { useCart, CartItem } from "@/contexts/CartContext";
+import { useCart, CartItem } from "@/contexts/CartTypes";
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -32,7 +32,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onOpenChange }) => {
             Shopping Cart ({totalQuantity})
           </SheetTitle>
           <SheetDescription>
-            Review and manage your cart items
+            Manage your shopping cart items
           </SheetDescription>
         </SheetHeader>
 
@@ -57,7 +57,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onOpenChange }) => {
                     <div className="flex-1">
                       <h3 className="font-semibold text-sm">{item.name}</h3>
                       <p className="text-xs text-gray-500">{item.shop?.name}</p>
-                      <p className="text-sm font-bold text-primary">₹{(item.price || 0).toLocaleString("en-IN")}</p>
+                      <p className="text-sm font-bold text-primary">{item.price ? `₹${item.price.toLocaleString("en-IN")}` : "Price not available"}</p>
                       <div className="flex items-center gap-2 mt-2">
                         <Badge variant="outline" className="text-xs">{item.size}</Badge>
                         {item.color && <Badge variant="outline" className="text-xs">{item.color}</Badge>}

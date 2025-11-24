@@ -1,9 +1,15 @@
-- [x] Analyze account creation and deletion code
-- [x] Identify missing DELETE policy for customers table
-- [x] Create migration to add DELETE policy for customers table
-- [x] Push migration to Supabase
-- [x] Create Supabase Edge Function for account deletion
-- [x] Deploy Edge Function to Supabase
-- [x] Update frontend to use Edge Function for account deletion
-- [x] Verify deletion works by testing or checking code
-- [x] Check if account creation has issues (seems fine)
+# Fix Console Errors
+
+## Issues to Fix
+- [ ] Controlled input warning in CustomerAuthModal
+- [ ] Invalid refresh token error
+- [ ] 406 error on shop_owners query (RLS policies)
+- [ ] Multiple sign out calls
+- [ ] React Router future flag warnings
+
+## Steps
+1. Fix CustomerAuthModal controlled input warning
+2. Improve auth error handling for refresh tokens
+3. Check and fix RLS policies for shop_owners table
+4. Prevent multiple sign out calls in Navbar
+5. Add React Router future flags

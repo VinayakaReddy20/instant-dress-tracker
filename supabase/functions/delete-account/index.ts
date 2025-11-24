@@ -1,16 +1,14 @@
-// Follow this setup guide to integrate the Deno language server with your editor:
-// https://deno.land/manual/getting_started/setup_your_environment
-// This enables autocomplete, go to definition, etc.
-
 // Setup type definitions for built-in Supabase Runtime APIs
 import "@supabase/functions-js"
-import "https://deno.land/std@0.208.0/dotenv/load.ts"
 import { createClient } from "@supabase/supabase-js"
-/// <reference lib="deno.window" />
+
+// Declare Deno for TypeScript
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare const Deno: any
 
 console.log("Delete Account Function")
 
-Deno.serve(async (req: { method: string; headers: { get: (arg0: string) => any } }) => {
+Deno.serve(async (req: Request) => {
   // Only allow POST requests
   if (req.method !== 'POST') {
     return new Response(
