@@ -42,7 +42,7 @@ const Map = ({
 }: MapProps) => {
   const validShops = shops.filter(shop => shop.latitude && shop.longitude);
 
-  const handleMapClick = (e: React.MouseEvent) => {
+  const handleMapClick = (e: React.SyntheticEvent) => {
     e.stopPropagation();
   };
 

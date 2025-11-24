@@ -10,11 +10,9 @@ interface CustomerProfile {
   full_name: string | null;
   phone: string | null;
   address: string | null;
-  city: string | null;
-  pincode: string | null;
   latitude: number | null;
   longitude: number | null;
-  profile_picture_url: string | null;
+  location_method: string | null;
   created_at: string;
   updated_at: string;
 }
