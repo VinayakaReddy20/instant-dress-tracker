@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, memo } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Store, Search, User, Menu, ShoppingCart, LogOut } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Store, Search, User, Menu, ShoppingCart, LogOut, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import AuthModal from "@/components/AuthModal";
 import CartDrawer from "@/components/CartDrawer";
-import { useCart } from "@/contexts/CartContext";
+import { useCart } from "@/hooks/useCart";
 import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import { useAuthModal } from "@/contexts/AuthModalContext";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -20,10 +20,18 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const { totalQuantity } = useCart();
   const { user, customerProfile, signOut } = useCustomerAuth();
   const { openModal } = useAuthModal();
   const isMobile = useIsMobile();
+  
+  // Check if shop owner is logged in (assuming shop owner auth context exists)
+  const shopOwnerUser = null; // TODO: Replace with actual shop owner auth hook when available
+  
+  const handleLogout = () => {
+    signOut();
+  };
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -102,28 +110,30 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
                 )}
               </Button>
               {user ? (
-                <div className="flex items-center space-x-4">
-                  <span className="text-gray-700 font-medium">Hello, {customerProfile?.full_name || user.email?.split('@')[0]}</span>
-                  <Link
-                    to="/customer-profile"
-                    className={`px-3 py-2 rounded-md text-sm font-medium ${
-                      isActive("/customer-profile")
-                        ? "bg-primary text-white"
-                        : "text-gray-700 hover:bg-gray-100"
-                    } flex items-center space-x-1`}
-                  >
-                    <User className="w-4 h-4" />
-                    <span>Profile</span>
-                  </Link>
-                  <Button
-                    variant="outline"
-                    onClick={() => signOut()}
-                    className="flex items-center space-x-1 px-3 py-2 rounded-md"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    <span>Logout</span>
-                  </Button>
-                </div>
+                <>
+                  <div className="flex items-center space-x-4">
+                    <span className="text-gray-700 font-medium">Hello, {customerProfile?.full_name || user.email?.split('@')[0]}</span>
+                    <Link
+                      to="/customer-profile"
+                      className={`px-3 py-2 rounded-md text-sm font-medium ${
+                        isActive("/customer-profile")
+                          ? "bg-primary text-white"
+                          : "text-gray-700 hover:bg-gray-100"
+                      } flex items-center space-x-1`}
+                    >
+                      <User className="w-4 h-4" />
+                      <span>Profile</span>
+                    </Link>
+                    <Button
+                      variant="outline"
+                      onClick={() => signOut()}
+                      className="flex items-center space-x-1 px-3 py-2 rounded-md"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Logout</span>
+                    </Button>
+                  </div>
+                </>
               ) : (
                 <div className="flex items-center space-x-2">
                   <Button
@@ -161,14 +171,14 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
             <div className="md:hidden mt-2 space-y-1 pb-4 border-t border-gray-200">
               <Link
                 to="/shops"
-                className="block px-4 py-2 rounded-md text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                className="flex px-4 py-2 rounded-md text-gray-700 hover:bg-gray-100 items-center space-x-2"
               >
                 <Store className="w-4 h-4" />
                 <span>Shops</span>
               </Link>
               <Link
                 to="/dresses"
-                className="block px-4 py-2 rounded-md text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                className="flex px-4 py-2 rounded-md text-gray-700 hover:bg-gray-100 items-center space-x-2"
               >
                 <Search className="w-4 h-4" />
                 <span>Dresses</span>
@@ -190,22 +200,29 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
                 )}
               </Button>
               {user ? (
-                <Link
-                  to="/customer-profile"
-                  className="block px-4 py-2 rounded-md text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <User className="w-4 h-4" />
-                  <span>Profile</span>
-                </Link>
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      handleLogout();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 rounded-md"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Logout</span>
+                  </Button>
+                </>
               ) : (
                 <Button
-                  onClick={handleCustomerLogin}
-                  variant="outline"
-                  className="w-full flex items-center justify-center space-x-2 px-4 py-2 rounded-md"
+                  onClick={() => {
+                    setIsAuthModalOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full bg-primary text-white hover:bg-primary-dark flex items-center justify-center space-x-2 px-4 py-2 rounded-md"
                 >
                   <User className="w-4 h-4" />
-                  <span>Customer</span>
+                  <span>Shop Owner</span>
                 </Button>
               )}
               <Button
@@ -222,6 +239,29 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
           )}
         </div>
       </nav>
+
+      {/* Dashboard Button - Only show if shop owner is logged in and not on dashboard page */}
+      {shopOwnerUser && location.pathname !== "/dashboard" && (
+        <div className="bg-gray-50 border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+            <Button
+              onClick={() => navigate("/dashboard")}
+              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white"
+              variant="default"
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Dashboard</span>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden Option - Not visible in navbar but accessible via direct URL */}
+      {shopOwnerUser && (
+        <div style={{ display: 'none' }} data-hidden-option="true">
+          <span>Hidden Dashboard Access</span>
+        </div>
+      )}
 
       {/* Auth Modal */}
       {isAuthModalOpen && (

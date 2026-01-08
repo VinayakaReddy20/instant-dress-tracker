@@ -37,7 +37,6 @@ export type Database = {
       customers: {
         Row: {
           address: string | null
-          city: string | null
           created_at: string
           email: string
           full_name: string | null
@@ -45,14 +44,13 @@ export type Database = {
           latitude: number | null
           longitude: number | null
           phone: string | null
-          pincode: string | null
           profile_picture_url: string | null
           updated_at: string
           user_id: string
+          location_method: string | null
         }
         Insert: {
           address?: string | null
-          city?: string | null
           created_at?: string
           email: string
           full_name?: string | null
@@ -60,14 +58,13 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           phone?: string | null
-          pincode?: string | null
           profile_picture_url?: string | null
           updated_at?: string
           user_id: string
+          location_method?: string | null
         }
         Update: {
           address?: string | null
-          city?: string | null
           created_at?: string
           email?: string
           full_name?: string | null
@@ -75,10 +72,10 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           phone?: string | null
-          pincode?: string | null
           profile_picture_url?: string | null
           updated_at?: string
           user_id?: string
+          location_method?: string | null
         }
         Relationships: []
       }
@@ -231,6 +228,151 @@ export type Database = {
             referencedRelation: "shop_owners"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      customer_addresses: {
+        Row: {
+          id: string
+          user_id: string
+          full_name: string
+          phone: string
+          house_street: string
+          city: string
+          state: string
+          pincode: string
+          is_default: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          full_name: string
+          phone: string
+          house_street: string
+          city: string
+          state: string
+          pincode: string
+          is_default?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          full_name?: string
+          phone?: string
+          house_street?: string
+          city?: string
+          state?: string
+          pincode?: string
+          is_default?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_addresses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      cart: {
+        Row: {
+          id: string
+          user_id: string
+          dress_id: string
+          quantity: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          dress_id: string
+          quantity?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          dress_id?: string
+          quantity?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cart_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cart_dress_id_fkey"
+            columns: ["dress_id"]
+            isOneToOne: false
+            referencedRelation: "dresses"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      customer_preferences: {
+        Row: {
+          id: string
+          customer_id: string
+          preferred_sizes: string[] | null
+          favorite_colors: string[] | null
+          style_preferences: string[] | null
+          budget_range: string | null
+          notification_preferences: Json | null
+          size_notes: string | null
+          color_notes: string | null
+          style_notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          customer_id: string
+          preferred_sizes?: string[] | null
+          favorite_colors?: string[] | null
+          style_preferences?: string[] | null
+          budget_range?: string | null
+          notification_preferences?: Json | null
+          size_notes?: string | null
+          color_notes?: string | null
+          style_notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          customer_id?: string
+          preferred_sizes?: string[] | null
+          favorite_colors?: string[] | null
+          style_preferences?: string[] | null
+          budget_range?: string | null
+          notification_preferences?: Json | null
+          size_notes?: string | null
+          color_notes?: string | null
+          style_notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_preferences_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          }
         ]
       }
     }

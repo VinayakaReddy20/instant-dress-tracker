@@ -402,7 +402,7 @@ const SearchResults = () => {
                           </div>
                           
                           <div className="flex flex-wrap gap-2">
-                            {shop.specialties?.map((specialty, idx) => (
+                            {shop.specialties?.map((specialty: string, idx: number) => (
                               <Badge key={idx} variant="secondary" className="text-xs">
                                 {specialty}
                               </Badge>
@@ -544,7 +544,7 @@ const SearchResults = () => {
                       </div>
 
                       <div className="flex flex-wrap gap-2">
-                        {shop.specialties?.map((specialty, idx) => (
+                        {shop.specialties?.map((specialty: string, idx: number) => (
                           <Badge key={idx} variant="secondary" className="text-xs">
                             {specialty}
                           </Badge>

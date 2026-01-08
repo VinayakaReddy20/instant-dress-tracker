@@ -117,6 +117,38 @@ export const extractAddressComponents = (place: google.maps.places.PlaceResult):
   return result;
 };
 
+// Extract address components from Geocoding result
+export const extractAddressFromGeocode = (geocodeResult: google.maps.GeocoderResult): {
+  street: string;
+  city: string;
+  state: string;
+  postalCode: string;
+} => {
+  const components = geocodeResult.address_components || [];
+  const result = {
+    street: '',
+    city: '',
+    state: '',
+    postalCode: '',
+  };
+
+  components.forEach((component) => {
+    const types = component.types;
+
+    if (types.includes('street_number') || types.includes('route')) {
+      result.street += (result.street ? ' ' : '') + component.long_name;
+    } else if (types.includes('locality') || types.includes('administrative_area_level_3') || types.includes('administrative_area_level_2')) {
+      result.city = component.long_name;
+    } else if (types.includes('administrative_area_level_1')) {
+      result.state = component.long_name;
+    } else if (types.includes('postal_code')) {
+      result.postalCode = component.long_name;
+    }
+  });
+
+  return result;
+};
+
 // Geocode address to coordinates
 export const geocodeAddress = async (address: string): Promise<{ latitude: number; longitude: number } | null> => {
   try {
@@ -138,6 +170,39 @@ export const geocodeAddress = async (address: string): Promise<{ latitude: numbe
     });
   } catch (error) {
     console.error('Geocoding error:', error);
+    return null;
+  }
+};
+
+// Reverse geocode coordinates to address
+export const reverseGeocode = async (latitude: number, longitude: number): Promise<{
+  street: string;
+  city: string;
+  state: string;
+  postalCode: string;
+} | null> => {
+  try {
+    console.log('Reverse geocoding coordinates:', latitude, longitude);
+    const maps = await initializeGoogleMaps();
+    const geocoder = new maps.Geocoder();
+
+    return new Promise((resolve) => {
+      geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
+        console.log('Reverse geocoding status:', status);
+        console.log('Reverse geocoding results:', results);
+
+        if (status === maps.GeocoderStatus.OK && results && results[0]) {
+          const addressComponents = extractAddressFromGeocode(results[0]);
+          console.log('Extracted address components:', addressComponents);
+          resolve(addressComponents);
+        } else {
+          console.warn('Reverse geocoding failed with status:', status);
+          resolve(null);
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Reverse geocoding error:', error);
     return null;
   }
 };

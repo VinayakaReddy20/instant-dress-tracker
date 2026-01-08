@@ -110,9 +110,9 @@ export const shopFormSchema = z.object({
     .max(100, "Hours must be less than 100 characters")
     .optional(),
   specialties: z
-    .array(z.string().max(50, "Each specialty must be less than 50 characters"))
-    .max(10, "Maximum 10 specialties allowed")
-    .optional(),
+    .array(z.string().regex(/^[A-Za-z ]+$/, "Each specialty can only contain letters and spaces"))
+    .optional()
+    .default([]),
   description: z
     .string()
     .max(500, "Description must be less than 500 characters")

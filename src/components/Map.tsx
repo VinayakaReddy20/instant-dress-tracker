@@ -12,7 +12,7 @@ Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-import { Tables } from "@/integrations/supabase/types";
+import { Tables } from "../types";
 
 type Shop = Tables<'shops'>;
 
@@ -42,6 +42,10 @@ const Map = ({
 }: MapProps) => {
   // Filter shops with valid coordinates
   const validShops = shops.filter(shop => shop.latitude && shop.longitude);
+
+  const handleMapClick = (e: React.SyntheticEvent) => {
+    e.stopPropagation();
+  };
 
   return (
     <div style={{ height, width: '100%' }}>

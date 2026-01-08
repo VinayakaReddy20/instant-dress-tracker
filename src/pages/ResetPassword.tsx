@@ -8,47 +8,65 @@ import { passwordSchema } from "@/lib/validations";
 
 const ResetPassword = () => {
   const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [sessionSet, setSessionSet] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    const handlePasswordReset = async () => {
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = hashParams.get("access_token");
-      const refreshToken = hashParams.get("refresh_token");
+    // Listen for auth state changes to detect when session is set from URL
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        // Check if this is a recovery session
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const type = hashParams.get('type');
 
-      if (accessToken && refreshToken) {
-        const { error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
-
-        if (error) {
+        if (type === 'recovery') {
+          // Valid recovery session - show the reset form
+          setSessionSet(true);
+        } else {
+          // Not a recovery session - redirect
           toast({
             title: "Error",
-            description: "Invalid or expired reset link.",
+            description: "Invalid reset link.",
             variant: "destructive",
           });
           navigate("/");
-        } else {
+        }
+      }
+    });
+
+    // Also check current session immediately in case it's already set
+    const checkCurrentSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const type = hashParams.get('type');
+        if (type === 'recovery') {
           setSessionSet(true);
         }
-      } else {
-        toast({
-          title: "Error",
-          description: "No reset token found in URL.",
-          variant: "destructive",
-        });
-        navigate("/");
       }
     };
 
-    handlePasswordReset();
+    checkCurrentSession();
+
+    // Cleanup subscription
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [navigate, toast]);
 
   const handleUpdatePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Passwords do not match",
+        description: "Please ensure both password fields are identical.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const validation = passwordSchema.safeParse(newPassword);
     if (!validation.success) {
       toast({
@@ -69,8 +87,13 @@ const ResetPassword = () => {
 
       toast({
         title: "Password updated successfully!",
-        description: "You can now log in with your new password.",
+        description: "You have been logged out. Please log in with your new password.",
       });
+
+      // Log out the user
+      await supabase.auth.signOut();
+
+      // Redirect to home page for login
       navigate("/");
     } catch (err: unknown) {
       console.error(err);
@@ -110,6 +133,12 @@ const ResetPassword = () => {
           placeholder="New Password"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
+        />
+        <Input
+          type="password"
+          placeholder="Confirm New Password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
         />
         <Button onClick={handleUpdatePassword} className="w-full" disabled={loading}>
           {loading ? "Updating..." : "Update Password"}
