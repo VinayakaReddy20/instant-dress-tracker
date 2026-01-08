@@ -3,30 +3,44 @@ import { supabase } from "../integrations/supabaseClient";
 import { toast } from "../components/ui/use-toast";
 import { useAuthModal } from "./AuthModalContext";
 import { useCustomerAuth } from "../hooks/useCustomerAuth";
-// Removed supabase types import as the types file doesn't exist
-import { CartItem, CartContextType } from './CartTypes';
+import { CartItem, CartContextType, SupabaseCartItem } from './CartTypes';
 import { CartContext } from './CartContextValue';
 
 export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const { user } = useCustomerAuth();
   const { openModal } = useAuthModal();
 
-  // Cache auth state to avoid repeated checks
+  // Load cart from localStorage on initial render
   useEffect(() => {
-    const loadCart = async () => {
-      if (!user) {
-        setCart([]);
-        return;
-      }
-
-      setIsLoading(true);
+    const savedCart = localStorage.getItem("cart");
+    if (savedCart) {
       try {
-        const { data: cartData, error } = await supabase
-          .from('cart')
+        setCart(JSON.parse(savedCart));
+      } catch (error) {
+        console.error("Failed to parse cart from localStorage:", error);
+      }
+    }
+  }, []);
+
+  // Sync cart with localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("cart", JSON.stringify(cart));
+  }, [cart]);
+
+  // Sync with Supabase when user logs in
+  useEffect(() => {
+    const syncWithSupabase = async () => {
+      if (!user) return;
+
+      try {
+        // Fetch cart items from Supabase
+        const { data: supabaseCart, error } = await supabase
+          .from("cart")
           .select(`
             id,
             quantity,
+            dress_id,
             dresses (
               id,
               name,
@@ -42,185 +56,179 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
               )
             )
           `)
-          .eq('user_id', user.id);
+          .eq("user_id", user.id);
 
-        if (error) {
-          console.error('Error loading cart:', error);
-          return;
+        if (error) throw error;
+
+        if (supabaseCart && supabaseCart.length > 0) {
+          const transformedCart: CartItem[] = supabaseCart.map((item: SupabaseCartItem) => ({
+            id: item.dresses.id,
+            name: item.dresses.name,
+            price: item.dresses.price,
+            size: item.dresses.size,
+            color: item.dresses.color,
+            category: item.dresses.category,
+            image_url: item.dresses.image_url,
+            shop_id: item.dresses.shop_id,
+            shop: item.dresses.shops.location ? {
+              name: item.dresses.shops.name,
+              location: item.dresses.shops.location
+            } : undefined,
+            quantity: item.quantity
+          }));
+
+          // Merge local cart with Supabase cart (prioritizing Supabase for now)
+          setCart(transformedCart);
         }
-
-        // Define interface for the joined data to avoid 'any'
-        interface SupabaseCartResponse {
-          id: string;
-          quantity: number;
-          dresses: {
-            id: string;
-            name: string;
-            price: number;
-            size: string;
-            color: string | null;
-            category: string | null;
-            image_url: string | null;
-            shop_id: string;
-            shops: {
-              name: string;
-              location: string | null;
-            } | null;
-          } | null;
-        }
-
-        const cartItems: CartItem[] = (cartData as unknown as SupabaseCartResponse[])?.map((item) => ({
-          id: item.dresses?.id || '',
-          name: item.dresses?.name || '',
-          price: item.dresses?.price || 0,
-          size: item.dresses?.size || '',
-          color: item.dresses?.color,
-          category: item.dresses?.category,
-          image_url: item.dresses?.image_url,
-          shop_id: item.dresses?.shop_id || '',
-          shop: item.dresses?.shops ? {
-            name: item.dresses.shops.name,
-            location: item.dresses.shops.location || ''
-          } : undefined,
-          quantity: item.quantity
-        })) || [];
-
-        setCart(cartItems);
-      } catch (error: unknown) {
-        console.error('Error loading cart:', error);
-        if ((error as { status?: number })?.status === 401 || (error as { status?: number })?.status === 403 || (error as { status?: number })?.status === 406) {
-          signOut();
-        }
-      } finally {
-        setIsLoading(false);
+      } catch (error) {
+        console.error("Error syncing cart with Supabase:", error);
       }
     };
 
-    checkAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setIsAuthenticated(!!session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+    syncWithSupabase();
+  }, [user]);
 
   const addToCart = async (item: Omit<CartItem, "quantity">) => {
-    // Use cached auth state instead of checking every time
-    if (isAuthenticated === false) {
-      // Trigger auth modal with callback to add to cart after login
-      openModal(() => addToCart(item));
+    if (!user) {
+      // If not logged in, we still add to local cart but show auth modal if needed
+      // (The DressDetail page handles showing the modal, but we can also handle it here if preferred)
+      setCart((prevCart) => {
+        const existingItem = prevCart.find((i) => i.id === item.id);
+        if (existingItem) {
+          return prevCart.map((i) =>
+            i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+          );
+        }
+        return [...prevCart, { ...item, quantity: 1 }];
+      });
       return;
     }
 
     try {
-      // Check stock availability
-      const { data: dressData, error: stockError } = await supabase
-        .from('dresses')
-        .select('stock')
-        .eq('id', item.id)
-        .single();
-
-      if (stockError) {
-        console.error('Error checking stock:', stockError);
-        if ((stockError as { status?: number })?.status === 401 || (stockError as { status?: number })?.status === 403 || (stockError as { status?: number })?.status === 406) {
-          signOut();
-          return;
-        }
-        toast({
-          title: "Error",
-          description: "Failed to check stock availability. Please try again.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (!dressData.stock || dressData.stock <= 0) {
-        toast({
-          title: "Out of Stock",
-          description: "This dress is currently out of stock and cannot be added to your cart.",
-          variant: "destructive",
-        });
-        return;
-      }
-      // Check if item already exists in cart
+      // Check if item already exists in Supabase cart
       const { data: existingCartItem, error: fetchError } = await supabase
-        .from('cart')
-        .select('id, quantity')
-        .eq('user_id', user.id)
-        .eq('dress_id', item.id)
+        .from("cart")
+        .select("id, quantity")
+        .eq("user_id", user.id)
+        .eq("dress_id", item.id)
         .single();
 
-      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "not found"
-        console.error('Error checking cart item:', fetchError);
-        if ((fetchError as { status?: number })?.status === 401 || (fetchError as { status?: number })?.status === 403 || (fetchError as { status?: number })?.status === 406) {
-          signOut();
-          return;
-        }
-        return;
-      }
+      if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
 
       if (existingCartItem) {
         // Update quantity
         const { error: updateError } = await supabase
-          .from('cart')
-          .update({ quantity: (existingCartItem as { quantity: number }).quantity + 1 })
-          .eq('id', (existingCartItem as { id: string }).id);
+          .from("cart")
+          .update({ quantity: existingCartItem.quantity + 1 })
+          .eq("id", existingCartItem.id);
 
-        if (updateError) {
-          console.error('Error updating cart item:', updateError);
-          if ((updateError as { status?: number })?.status === 401 || (updateError as { status?: number })?.status === 403 || (updateError as { status?: number })?.status === 406) {
-            signOut();
-            return;
-          }
-          return;
-        }
+        if (updateError) throw updateError;
       } else {
-        return [...prevCart, { ...item, quantity: 1 }];
+        // Insert new item
+        const { error: insertError } = await supabase
+          .from("cart")
+          .insert({
+            user_id: user.id,
+            dress_id: item.id,
+            quantity: 1
+          });
+
+        if (insertError) throw insertError;
       }
-    });
 
-    toast({
-      title: "Added to cart!",
-      description: `${item.name} has been added to your cart.`,
-    });
+      // Update local state
+      setCart((prevCart) => {
+        const existingItem = prevCart.find((i) => i.id === item.id);
+        if (existingItem) {
+          return prevCart.map((i) =>
+            i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+          );
+        }
+        return [...prevCart, { ...item, quantity: 1 }];
+      });
+    } catch (error) {
+      console.error("Error adding to cart in Supabase:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add item to cart. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const removeFromCart = (id: string) => {
-    setCart((prevCart) => prevCart.filter((item) => item.id !== id));
-  };
-
-  const updateQuantity = (id: string, quantity: number) => {
+  const updateQuantity = async (id: string, quantity: number) => {
     if (quantity <= 0) {
       removeFromCart(id);
       return;
     }
+
     setCart((prevCart) =>
       prevCart.map((item) =>
         item.id === id ? { ...item, quantity } : item
       )
     );
+
+    if (user) {
+      try {
+        const { error } = await supabase
+          .from("cart")
+          .update({ quantity })
+          .eq("user_id", user.id)
+          .eq("dress_id", id);
+
+        if (error) throw error;
+      } catch (error) {
+        console.error("Error updating quantity in Supabase:", error);
+      }
+    }
   };
 
-  const clearCart = () => {
+  const removeFromCart = async (id: string) => {
+    setCart((prevCart) => prevCart.filter((item) => item.id !== id));
+
+    if (user) {
+      try {
+        const { error } = await supabase
+          .from("cart")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("dress_id", id);
+
+        if (error) throw error;
+      } catch (error) {
+        console.error("Error removing from cart in Supabase:", error);
+      }
+    }
+  };
+
+  const clearCart = async () => {
     setCart([]);
+    localStorage.removeItem("cart");
+
+    if (user) {
+      try {
+        const { error } = await supabase
+          .from("cart")
+          .delete()
+          .eq("user_id", user.id);
+
+        if (error) throw error;
+      } catch (error) {
+        console.error("Error clearing cart in Supabase:", error);
+      }
+    }
   };
 
-  const totalQuantity = cart.reduce((sum: number, item: CartItem) => sum + item.quantity, 0);
+  const totalQuantity = cart.reduce((total, item) => total + item.quantity, 0);
 
-  return (
-    <CartContext.Provider
-      value={{ cart, addToCart, updateQuantity, removeFromCart, clearCart, totalQuantity }}
-    >
-      {children}
-    </CartContext.Provider>
-  );
-};
+  const value = {
+    cart,
+    addToCart,
+    updateQuantity,
+    removeFromCart,
+    clearCart,
+    totalQuantity
+  };
 
-export const useCart = (): CartContextType => {
-  const context = useContext(CartContext);
-  if (!context) {
-    throw new Error("useCart must be used within a CartProvider");
-  }
-  return context;
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 };

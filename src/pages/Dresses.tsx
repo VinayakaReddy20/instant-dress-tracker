@@ -15,7 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/integrations/supabaseClient";
-import { useCart } from "@/contexts/CartContext";
+import { useCart } from "@/hooks/useCart";
 import { useAuthModal } from "@/contexts/AuthModalContext";
 import { searchSchema, type SearchFormData } from "@/lib/validations";
 import { toast } from "@/components/ui/use-toast";

@@ -10,11 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { useAuthModal } from "@/contexts/AuthModalContext";
-<<<<<<< Updated upstream
-=======
-import { verifyEmail } from "@/lib/emailVerification";
 import { useNavigate } from "react-router-dom";
->>>>>>> Stashed changes
 
 interface CustomerAuthModalProps {
   isOpen: boolean;

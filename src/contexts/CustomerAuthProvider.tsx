@@ -1,7 +1,7 @@
 import React, { useContext, useState, useEffect, ReactNode, useRef } from "react";
 import { supabase } from "../integrations/supabaseClient";
 import { User, Session, AuthChangeEvent, AuthError } from "@supabase/supabase-js";
-import { CustomerAuthContext, CustomerAuthContextType } from "./CustomerAuthContext";
+import { CustomerAuthContext } from "./CustomerAuthContext";
 
 const handleOAuthUserProfile = async (user: User) => {
   try {
@@ -192,6 +192,7 @@ export const CustomerAuthProvider = ({ children }: { children: ReactNode }) => {
   const value = {
     user,
     session,
+    customerProfile: null,
     isLoading,
     signOut,
   };

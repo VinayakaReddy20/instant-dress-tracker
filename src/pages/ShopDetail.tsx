@@ -8,7 +8,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
-import { useCart } from "../contexts/CartTypes";
+import { useCart } from "../hooks/useCart";
 import { useAuthModal } from "../contexts/AuthModalContext";
 import { useCustomerAuth } from "../hooks/useCustomerAuth";
 import { useToast } from "../components/ui/use-toast";

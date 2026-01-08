@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabaseClient";
-import { useCart } from "@/contexts/CartContext";
+import { useCart } from "@/hooks/useCart";
 import { useAuthModal } from "@/contexts/AuthModalContext";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -15,18 +15,18 @@ interface DressDetailType {
   id: string;
   shop_id: string;
   name: string;
-  price: number;
+  price: number | null;
   stock: number | null;
   size: string;
-  color: string;
-  category: string;
+  color: string | null;
+  category: string | null;
   image_url: string | null;
   description: string | null;
   material: string | null;
   brand: string | null;
   created_at: string;
   updated_at: string;
-  shops: { name: string; location: string } | null;
+  shops: { name: string; location: string | null } | null;
 }
 
 const DressDetail = () => {
@@ -81,7 +81,7 @@ const DressDetail = () => {
           category: dress.category || undefined,
           image_url: dress.image_url || undefined,
           shop_id: dress.shop_id,
-          shop: dress.shops ? { name: dress.shops.name, location: dress.shops.location } : undefined
+          shop: dress.shops && dress.shops.location ? { name: dress.shops.name, location: dress.shops.location } : undefined
         });
         toast({
           title: "Added to cart!",
@@ -145,7 +145,7 @@ const DressDetail = () => {
             )}
             <div className="flex items-center space-x-4">
               <span className="text-2xl font-semibold text-primary">
-                ₹{dress.price.toLocaleString("en-IN")}
+                ₹{(dress.price || 0).toLocaleString("en-IN")}
               </span>
               {dress.stock && dress.stock > 0 ? (
                 <Badge variant="default">{dress.stock} in stock</Badge>
@@ -155,8 +155,8 @@ const DressDetail = () => {
             </div>
             <div className="space-y-1">
               <p><strong>Size:</strong> {dress.size}</p>
-              <p><strong>Color:</strong> {dress.color}</p>
-              <p><strong>Category:</strong> {dress.category}</p>
+              <p><strong>Color:</strong> {dress.color || 'N/A'}</p>
+              <p><strong>Category:</strong> {dress.category || 'N/A'}</p>
               {dress.material && <p><strong>Material:</strong> {dress.material}</p>}
               {dress.brand && <p><strong>Brand:</strong> {dress.brand}</p>}
               {dress.description && (

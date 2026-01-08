@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCart } from '../../contexts/CartTypes';
+import { useCart } from '../../hooks/useCart';
 import { useCustomerAuth } from '../../hooks/useCustomerAuth';
 import { CartItem } from '../../contexts/CartTypes';
 import { Button } from '../../components/ui/button';

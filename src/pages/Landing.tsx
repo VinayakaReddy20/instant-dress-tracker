@@ -11,7 +11,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import heroBoutique from "@/assets/hero-boutique.jpg";
 import { supabase } from "@/integrations/supabaseClient";
-import { useCart } from "@/contexts/CartContext";
+import { useCart } from "@/hooks/useCart";
 import { useAuthModal } from "@/contexts/AuthModalContext";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -26,9 +26,8 @@ type Dress = Database["public"]["Tables"]["dresses"]["Row"] & {
   shops?: { name: string; location: string | null; };
 };
 
-type CartItem = Dress & {
-  quantity: number;
-};
+// Import the CartItem type from CartTypes to ensure compatibility
+import { CartItem } from '@/contexts/CartTypes';
 
 const Landing = () => {
   const navigate = useNavigate();
@@ -348,7 +347,7 @@ const Landing = () => {
   };
 
   // Cart total quantity
-  const totalCartQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const totalCartQuantity = cart.reduce((sum: number, item) => sum + item.quantity, 0);
 
   // Calculate active filters count
   const activeFiltersCount = (selectedCategories.length > 0 ? 1 : 0) +
