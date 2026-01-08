@@ -1,18 +1,19 @@
 // src/pages/ShopDetail.tsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { MapPin, Phone, Clock, Star, Package, ShoppingCart, Navigation, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabaseClient";
-import { Tables } from "@/integrations/supabase/types";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useCart } from "@/contexts/CartContext";
-import { useAuthModal } from "@/contexts/AuthModalContext";
-import { useToast } from "@/components/ui/use-toast";
-import Map from "@/components/Map";
-import { getCurrentLocation, reverseGeocode } from "@/lib/geolocation";
+import { MapPin, Phone, Clock, Star, Package, ShoppingCart, Navigation, Loader2, ChevronLeft } from "lucide-react";
+import { supabase } from "../integrations/supabaseClient";
+import { Tables } from "../types";
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
+import { Button } from "../components/ui/button";
+import { Badge } from "../components/ui/badge";
+import { useCart } from "../contexts/CartTypes";
+import { useAuthModal } from "../contexts/AuthModalContext";
+import { useCustomerAuth } from "../hooks/useCustomerAuth";
+import { useToast } from "../components/ui/use-toast";
+import Map from "../components/Map";
+import { getCurrentLocation, reverseGeocode, type LocationError } from "../lib/geolocation";
 
 type Shop = Tables<'shops'>;
 type Dress = Tables<'dresses'>;
@@ -85,6 +86,18 @@ const ShopDetail = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+
+      {/* Back Button */}
+      <div className="max-w-5xl mx-auto px-4 pt-6">
+        <Button
+          variant="outline"
+          className="flex items-center gap-2 text-primary border-primary hover:bg-primary/10"
+          onClick={() => navigate(-1)}
+        >
+          <ChevronLeft className="w-4 h-4" />
+          Back
+        </Button>
+      </div>
 
       {/* Shop Banner */}
       <div className="relative h-72 md:h-96 w-full overflow-hidden">
@@ -169,7 +182,7 @@ const ShopDetail = () => {
 
           {shop.specialties && shop.specialties.length > 0 && (
             <div className="flex flex-wrap gap-2 pt-4">
-              {shop.specialties.map((s, i) => (
+              {shop.specialties.map((s: string, i: number) => (
                 <Badge key={i} variant="secondary">
                   {s}
                 </Badge>
@@ -196,26 +209,58 @@ const ShopDetail = () => {
                   setLocationLoading(true);
                   try {
                     const location = await getCurrentLocation();
-                    if (location && shop.latitude && shop.longitude) {
+                    if ('latitude' in location && shop.latitude && shop.longitude) {
                       const shopLat = shop.latitude;
                       const shopLng = shop.longitude;
                       const userLat = location.latitude;
                       const userLng = location.longitude;
-
-                      // Open Google Maps with directions
+  
+                      // Open Google Maps with directions in a new tab/window
+                      // This ensures external navigation doesn't interfere with app state
                       const url = `https://www.google.com/maps/dir/${userLat},${userLng}/${shopLat},${shopLng}`;
-                      window.open(url, '_blank');
-
+                      
+                      // Use a small delay to ensure the loading state is properly set
+                      setTimeout(() => {
+                        try {
+                          const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+                          if (!newWindow) {
+                            toast({
+                              title: "Popup blocked",
+                              description: "Please allow popups for this site to open Google Maps.",
+                              variant: "destructive",
+                            });
+                          } else {
+                            toast({
+                              title: "Opening directions",
+                              description: "Google Maps will open with directions to this shop.",
+                            });
+                          }
+                        } catch (error) {
+                          console.error('Error opening Google Maps:', error);
+                          toast({
+                            title: "Error",
+                            description: "Failed to open Google Maps. Please try again.",
+                            variant: "destructive",
+                          });
+                        } finally {
+                          setLocationLoading(false);
+                        }
+                      }, 100); // Small delay to ensure loading state is set
+                    } else if ('userMessage' in location) {
+                      // Handle LocationError
                       toast({
-                        title: "Opening directions",
-                        description: "Google Maps will open with directions to this shop.",
+                        title: "Location error",
+                        description: location.userMessage,
+                        variant: "destructive",
                       });
+                      setLocationLoading(false);
                     } else {
                       toast({
                         title: "Location error",
                         description: "Unable to get your location. Please check your browser permissions.",
                         variant: "destructive",
                       });
+                      setLocationLoading(false);
                     }
                   } catch (error) {
                     console.error('Error getting location:', error);
@@ -224,7 +269,6 @@ const ShopDetail = () => {
                       description: "Failed to get your location. Please try again.",
                       variant: "destructive",
                     });
-                  } finally {
                     setLocationLoading(false);
                   }
                 }}

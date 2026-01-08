@@ -14,10 +14,13 @@ import Dashboard from "./pages/Dashboard";
 import SearchResults from "./pages/SearchResults";
 import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
+import CustomerProfile from "./pages/CustomerProfile";
+import CustomerDashboard from "./pages/CustomerDashboard";
 import AuthModal from "@/components/AuthModal";
 import CustomerAuthModal from "@/components/CustomerAuthModal";
 import CustomerAuth from "./pages/CustomerAuth";
-import CustomerProfile from "./pages/CustomerProfile";
+import ErrorBoundary from "@/components/ErrorBoundary";
+
 import { supabase } from "@/integrations/supabaseClient";
 import { CartProvider } from "@/contexts/CartContext";
 import { AuthModalProvider, useAuthModal } from "@/contexts/AuthModalContext";
@@ -89,6 +92,8 @@ const AppContent: React.FC = () => {
           <Route path="/shop/:shopId" element={<ShopDetail />} />
           <Route path="/search" element={<SearchResults />} />
           <Route path="/customer-auth" element={<CustomerAuth />} />
+          <Route path="/customer-dashboard" element={<CustomerDashboard />} />
+          <Route path="/profile" element={<CustomerProfile />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 
           <Route
@@ -123,11 +128,13 @@ const App: React.FC = () => {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthModalProvider>
-          <CartProvider>
+          <ErrorBoundary>
             <CustomerAuthProvider>
-              <AppContent />
+              <CartProvider>
+                <AppContent />
+              </CartProvider>
             </CustomerAuthProvider>
-          </CartProvider>
+          </ErrorBoundary>
         </AuthModalProvider>
       </TooltipProvider>
     </QueryClientProvider>

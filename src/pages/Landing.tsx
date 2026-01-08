@@ -16,6 +16,7 @@ import { useAuthModal } from "@/contexts/AuthModalContext";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { debugLog, logApiError } from "@/lib/errorHandling";
+
 import type { Database } from "@/types";
 
 // Use database schema types

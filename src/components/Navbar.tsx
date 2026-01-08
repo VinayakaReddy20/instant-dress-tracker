@@ -102,6 +102,27 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
                 )}
               </Button>
               {user ? (
+                <Link
+                  to="/customer-dashboard"
+                  className={`px-3 py-2 rounded-md text-sm font-medium flex items-center space-x-1 ${
+                    isActive("/customer-dashboard")
+                      ? "bg-primary text-white"
+                      : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  <User className="w-4 h-4" />
+                  <span>Dashboard</span>
+                </Link>
+              ) : (
+                <Button
+                  onClick={handleCustomerLogin}
+                  className="bg-primary text-white hover:bg-primary-dark flex items-center space-x-1 px-3 py-2 rounded-md"
+                >
+                  <User className="w-4 h-4" />
+                  <span>Customer</span>
+                </Button>
+              )}
+              {shopOwnerUser ? (
                 <div className="flex items-center space-x-4">
                   <span className="text-gray-700 font-medium">Hello, {customerProfile?.full_name || user.email?.split('@')[0]}</span>
                   <Link
@@ -191,9 +212,56 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
               </Button>
               {user ? (
                 <Link
-                  to="/customer-profile"
-                  className="block px-4 py-2 rounded-md text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  to="/customer-dashboard"
+                  className="flex items-center space-x-2 px-4 py-2 rounded-md text-gray-700 hover:bg-gray-100"
                   onClick={() => setMobileMenuOpen(false)}
+                >
+                  <User className="w-4 h-4" />
+                  <span>Dashboard</span>
+                </Link>
+              ) : (
+                <Button
+                  onClick={() => {
+                    handleCustomerLogin();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full bg-primary text-white hover:bg-primary-dark flex items-center justify-center space-x-2 px-4 py-2 rounded-md"
+                >
+                  <User className="w-4 h-4" />
+                  <span>Customer</span>
+                </Button>
+              )}
+              {shopOwnerUser ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    handleLogout();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center justify-center space-x-2 px-4 py-2 rounded-md"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout</span>
+                </Button>
+              ) : user ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    handleLogout();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center justify-center space-x-2 px-4 py-2 rounded-md"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout</span>
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => {
+                    setIsAuthModalOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full bg-primary text-white hover:bg-primary-dark flex items-center justify-center space-x-2 px-4 py-2 rounded-md"
                 >
                   <User className="w-4 h-4" />
                   <span>Profile</span>
@@ -222,6 +290,29 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
           )}
         </div>
       </nav>
+
+      {/* Dashboard Button - Only show if shop owner is logged in and not on dashboard page */}
+      {shopOwnerUser && location.pathname !== "/dashboard" && (
+        <div className="bg-gray-50 border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+            <Button
+              onClick={() => navigate("/dashboard")}
+              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white"
+              variant="default"
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Dashboard</span>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden Option - Not visible in navbar but accessible via direct URL */}
+      {shopOwnerUser && (
+        <div style={{ display: 'none' }} data-hidden-option="true">
+          <span>Hidden Dashboard Access</span>
+        </div>
+      )}
 
       {/* Auth Modal */}
       {isAuthModalOpen && (

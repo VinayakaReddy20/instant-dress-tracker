@@ -8,11 +8,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { supabase } from "@/integrations/supabaseClient";
 import { shopFormSchema, type ShopFormData as ValidatedShopFormData } from "@/lib/validations";
-import { getCurrentLocation, reverseGeocode } from "@/lib/geolocation";
+import { getCurrentLocation, reverseGeocode, type LocationError } from "@/lib/geolocation";
 import Map from "@/components/Map";
 import { validateAddress } from "@/lib/googleMaps";
 
-import type { Database } from "@/types/shared";
+import type { Database } from "@/types";
 import { Loader2, MapPin, Camera, Navigation, CheckCircle, XCircle } from "lucide-react";
 
 interface ShopEditFormProps {
@@ -108,7 +108,7 @@ const ShopEditForm: React.FC<ShopEditFormProps> = ({ initialData, onSave, onCanc
     setLocationLoading(true);
     try {
       const location = await getCurrentLocation();
-      if (location) {
+      if ('latitude' in location) {
         // Get the address from coordinates using reverse geocoding
         const address = await reverseGeocode(location.latitude, location.longitude);
 
@@ -121,6 +121,9 @@ const ShopEditForm: React.FC<ShopEditFormProps> = ({ initialData, onSave, onCanc
         }
 
         alert('Location captured successfully! Click "Update Details" to save.');
+      } else if ('userMessage' in location) {
+        // Handle LocationError
+        alert(location.userMessage);
       } else {
         alert('Unable to get your location. Please check your browser permissions.');
       }

@@ -130,6 +130,19 @@ const DressDetail = () => {
           </div>
           <div className="md:w-1/2 space-y-4">
             <h1 className="text-3xl font-bold">{dress.name}</h1>
+            {dress.shops && (
+              <div className="flex items-center space-x-2">
+                <MapPin className="w-4 h-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Shop:</span>
+                <Button
+                  variant="link"
+                  className="p-0 h-auto font-semibold text-primary hover:underline"
+                  onClick={() => navigate(`/shop/${dress.shop_id}`)}
+                >
+                  {dress.shops.name}
+                </Button>
+              </div>
+            )}
             <div className="flex items-center space-x-4">
               <span className="text-2xl font-semibold text-primary">
                 ₹{dress.price.toLocaleString("en-IN")}
