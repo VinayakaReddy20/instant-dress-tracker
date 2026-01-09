@@ -1,8 +1,8 @@
 // src/hooks/useShops.ts
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabaseClient";
-import { Tables } from "@/integrations/supabase/types";
-import { calculateDistance } from "@/lib/geolocation";
+import { supabase } from "../integrations/supabaseClient";
+import { Tables } from "../types";
+import { calculateDistance } from "../lib/geolocation";
 
 export type Shop = Tables<'shops'>;
 
@@ -54,10 +54,10 @@ export const useShops = (filters?: ShopFilters) => {
       const query = filters.searchQuery.toLowerCase();
       filtered = filtered.filter(shop =>
         shop.name.toLowerCase().includes(query) ||
-        shop.location.toLowerCase().includes(query) ||
-        shop.address.toLowerCase().includes(query) ||
+        (shop.location && shop.location.toLowerCase().includes(query)) ||
+        (shop.address && shop.address.toLowerCase().includes(query)) ||
         shop.description?.toLowerCase().includes(query) ||
-        shop.specialties?.some(specialty => specialty.toLowerCase().includes(query))
+        shop.specialties?.some((specialty: string) => specialty.toLowerCase().includes(query))
       );
     }
 

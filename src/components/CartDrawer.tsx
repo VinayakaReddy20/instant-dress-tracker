@@ -3,7 +3,8 @@ import { ShoppingCart, X, Plus, Minus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { useCart, CartItem } from "@/contexts/CartContext";
+import { useCart } from "@/hooks/useCart";
+import { CartItem } from "@/contexts/CartTypes";
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -13,7 +14,7 @@ interface CartDrawerProps {
 const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onOpenChange }) => {
   const { cart, addToCart, updateQuantity, removeFromCart, clearCart, totalQuantity } = useCart();
 
-  const totalPrice = cart.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
+  const totalPrice = cart.reduce((sum: number, item: CartItem) => sum + (item.price || 0) * item.quantity, 0);
 
   const handleIncreaseQuantity = (item: CartItem) => {
     addToCart(item);
@@ -47,7 +48,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onOpenChange }) => {
           ) : (
             <>
               <div className="flex-1 overflow-y-auto py-4">
-                {cart.map((item) => (
+                {cart.map((item: CartItem) => (
                   <div key={item.id} className="flex items-center gap-4 p-4 border-b border-gray-200">
                     <img
                       src={item.image_url || "https://via.placeholder.com/100x100?text=Dress"}

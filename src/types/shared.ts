@@ -1,9 +1,11 @@
-import type { Database } from "@/integrations/supabase/types";
+import type { Tables } from "@/types";
 
 // Shared types used across pages to ensure schema consistency
 
-export type DressRow = Database["public"]["Tables"]["dresses"]["Row"];
-export type ShopRow = Database["public"]["Tables"]["shops"]["Row"];
+export type DressRow = Tables<"dresses">;
+export type ShopRow = Tables<"shops">;
+export type CustomerRow = Tables<"customers">;
+export type CustomerAddressRow = Tables<"customer_addresses">;
 
 export interface Dress extends DressRow {
   shops: Pick<ShopRow, "name" | "location"> | null;
@@ -11,9 +13,8 @@ export interface Dress extends DressRow {
 
 export interface ShopWithCount extends ShopRow {
   dress_count: number;
-  latitude?: number;
-  longitude?: number;
 }
 
-// Re-export Database type for convenience
-export type { Database };
+export interface CustomerWithAddresses extends CustomerRow {
+  addresses: CustomerAddressRow[];
+}
