@@ -1,7 +1,7 @@
 import React, { useState, useEffect, ReactNode } from "react";
 import { supabase } from "../integrations/supabaseClient";
 import { toast } from "../components/ui/use-toast";
-import { useAuthModal } from "./AuthModalContext";
+import { useAuthModal } from "./useAuthModal";
 import { useCustomerAuth } from "../hooks/useCustomerAuth";
 import { CartItem, CartContextType, SupabaseCartItem } from './CartTypes';
 import { CartContext } from './CartContextValue';

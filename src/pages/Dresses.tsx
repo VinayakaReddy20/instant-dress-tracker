@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/integrations/supabaseClient";
 import { useCart } from "@/hooks/useCart";
-import { useAuthModal } from "@/contexts/AuthModalContext";
+import { useAuthModal } from "@/contexts/useAuthModal";
 import { searchSchema, type SearchFormData } from "@/lib/validations";
 import { toast } from "@/components/ui/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -210,39 +210,21 @@ const Dresses = () => {
   const { openModal } = useAuthModal();
 
   const handleAddToCart = (dress: Dress) => {
-    // Temporarily force modal to open for testing
-    openModal(() => {
-      addToCart({
-        id: dress.id,
-        name: dress.name,
-        price: dress.price || 0,
-        size: dress.size,
-        color: dress.color || undefined,
-        category: dress.category || undefined,
-        image_url: dress.image_url || undefined,
-        shop_id: dress.shop_id,
-        shop: dress.shops ? { name: dress.shops.name, location: dress.shops.location ?? "" } : undefined
-      });
-      toast({
-        title: "Added to cart!",
-        description: `${dress.name} has been added to your cart.`,
-      });
-    });
-    /*
     supabase.auth.getSession().then(({ data }) => {
       if (!data.session) {
-        openModal(() => handleAddToCart(dress));
+        // Open auth modal with redirect back to this dresses page
+        openModal(() => handleAddToCart(dress), `/dresses`);
       } else {
         addToCart({
           id: dress.id,
           name: dress.name,
-          price: dress.price,
+          price: dress.price || 0,
           size: dress.size,
           color: dress.color || undefined,
           category: dress.category || undefined,
           image_url: dress.image_url || undefined,
           shop_id: dress.shop_id,
-          shop: dress.shops ? { name: dress.shops.name, location: dress.shops.location } : undefined
+          shop: dress.shops ? { name: dress.shops.name, location: dress.shops.location ?? "" } : undefined
         });
         toast({
           title: "Added to cart!",
@@ -250,7 +232,6 @@ const Dresses = () => {
         });
       }
     });
-    */
   };
 
   return (
@@ -450,7 +431,8 @@ const Dresses = () => {
                           onClick={() => {
                             supabase.auth.getSession().then(({ data }) => {
                               if (!data.session) {
-                                openModal(() => navigate(`/dress/${dress.id}`));
+                                // Open auth modal with redirect to dress detail page
+                                openModal(() => navigate(`/dress/${dress.id}`), `/dress/${dress.id}`);
                               } else {
                                 navigate(`/dress/${dress.id}`);
                               }

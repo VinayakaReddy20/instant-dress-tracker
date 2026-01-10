@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
+import LogoutConfirmationModal from "@/components/LogoutConfirmationModal";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +21,7 @@ import {
 import { supabase } from "@/integrations/supabaseClient";
 import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import Navbar from "@/components/Navbar";
-import { getCurrentLocation, reverseGeocode } from "@/lib/geolocation";
+import { getCurrentLocation, LocationCoordinates, reverseGeocode } from "@/lib/geolocation";
 import {
   User,
   Mail,
@@ -48,9 +49,10 @@ interface CustomerProfile {
   address: string | null;
   city: string | null;
   pincode: string | null;
-  latitude?: number;
-  longitude?: number;
+  latitude: number | null;
+  longitude: number | null;
   profile_picture_url: string | null;
+  location_method: string | null;
 }
 
 export default function CustomerProfile() {
@@ -79,6 +81,7 @@ export default function CustomerProfile() {
   const [enablingLocation, setEnablingLocation] = useState(false);
   const [updatingProfile, setUpdatingProfile] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   // Fetch customer profile
   useEffect(() => {
@@ -203,7 +206,7 @@ export default function CustomerProfile() {
 
     try {
       const location = await getCurrentLocation();
-      if (!location) {
+      if (!location || 'code' in location) {
         toast({
           title: "Error",
           description: "Unable to get your location. Please check your browser permissions.",
@@ -213,7 +216,7 @@ export default function CustomerProfile() {
       }
 
       // Reverse geocode to get address
-      const address = await reverseGeocode(location.latitude, location.longitude);
+      const address = await reverseGeocode((location as LocationCoordinates).latitude, (location as LocationCoordinates).longitude);
       if (!address) {
         toast({
           title: "Error",
@@ -338,7 +341,11 @@ export default function CustomerProfile() {
   };
 
   // Handle logout
-  const handleLogout = async () => {
+  const handleLogout = () => {
+    setShowLogoutDialog(true);
+  };
+
+  const handleConfirmLogout = async () => {
     try {
       await signOut();
       navigate("/");
@@ -811,6 +818,13 @@ export default function CustomerProfile() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Logout Confirmation Modal */}
+      <LogoutConfirmationModal
+        isOpen={showLogoutDialog}
+        onClose={() => setShowLogoutDialog(false)}
+        onConfirm={handleConfirmLogout}
+      />
     </div>
   );
 }

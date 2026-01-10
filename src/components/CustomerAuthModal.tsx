@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
-import { useAuthModal } from "@/contexts/AuthModalContext";
+import { useAuthModal } from "@/contexts/useAuthModal";
 import { useNavigate } from "react-router-dom";
 
 interface CustomerAuthModalProps {
@@ -22,7 +22,7 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const { executeCallback } = useAuthModal();
+  const { executeCallback, redirectPath } = useAuthModal();
   const navigate = useNavigate();
 
   const form = useForm<LoginFormData | SignupFormData | ForgotPasswordFormData>({
@@ -32,6 +32,11 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
+      // Store the intended redirect path in localStorage for OAuth flow
+      if (redirectPath) {
+        localStorage.setItem('post_auth_redirect', redirectPath);
+      }
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -119,7 +124,14 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }
           }
 
           toast.success("Login successful!");
-          executeCallback();
+          
+          // Redirect to the intended page if specified
+          if (redirectPath) {
+            navigate(redirectPath);
+          } else {
+            // If no redirect path, execute the callback
+            executeCallback();
+          }
         }
       } catch (err) {
         console.error("Login error:", err);

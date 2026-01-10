@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import AuthModal from "@/components/AuthModal";
 import CartDrawer from "@/components/CartDrawer";
+import LogoutConfirmationModal from "@/components/LogoutConfirmationModal";
 import { useCart } from "@/hooks/useCart";
 import { useCustomerAuth } from "@/hooks/useCustomerAuth";
-import { useAuthModal } from "@/contexts/AuthModalContext";
+import { useAuthModal } from "@/contexts/useAuthModal";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface NavbarProps {
@@ -19,6 +20,7 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { totalQuantity } = useCart();
@@ -30,6 +32,10 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
   const shopOwnerUser = null; // TODO: Replace with actual shop owner auth hook when available
   
   const handleLogout = () => {
+    setIsLogoutModalOpen(true);
+  };
+
+  const handleConfirmLogout = () => {
     signOut();
   };
 
@@ -126,7 +132,7 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
                     </Link>
                     <Button
                       variant="outline"
-                      onClick={() => signOut()}
+                      onClick={handleLogout}
                       className="flex items-center space-x-1 px-3 py-2 rounded-md"
                     >
                       <LogOut className="w-4 h-4" />
@@ -276,6 +282,13 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin, onSearch }) => {
       <CartDrawer
         isOpen={isCartOpen}
         onOpenChange={setIsCartOpen}
+      />
+
+      {/* Logout Confirmation Modal */}
+      <LogoutConfirmationModal
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+        onConfirm={handleConfirmLogout}
       />
     </>
   );

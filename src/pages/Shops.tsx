@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/integrations/supabaseClient";
-import { useAuthModal } from "@/contexts/AuthModalContext";
+import { useAuthModal } from "@/contexts/useAuthModal";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { ShopWithCount } from "@/types/shared";
 

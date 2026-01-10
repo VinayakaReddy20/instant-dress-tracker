@@ -9,7 +9,7 @@ import Footer from "../components/Footer";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { useCart } from "../hooks/useCart";
-import { useAuthModal } from "../contexts/AuthModalContext";
+import { useAuthModal } from "../contexts/useAuthModal";
 import { useCustomerAuth } from "../hooks/useCustomerAuth";
 import { useToast } from "../components/ui/use-toast";
 import Map from "../components/Map";

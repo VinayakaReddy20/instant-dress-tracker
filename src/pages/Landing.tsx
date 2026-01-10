@@ -12,7 +12,7 @@ import Footer from "@/components/Footer";
 import heroBoutique from "@/assets/hero-boutique.jpg";
 import { supabase } from "@/integrations/supabaseClient";
 import { useCart } from "@/hooks/useCart";
-import { useAuthModal } from "@/contexts/AuthModalContext";
+import { useAuthModal } from "@/contexts/useAuthModal";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { debugLog, logApiError } from "@/lib/errorHandling";
@@ -361,7 +361,7 @@ const Landing = () => {
   const handleAddToCart = (dress: Dress) => {
     supabase.auth.getSession().then(({ data }) => {
       if (!data.session) {
-        openModal(() => handleAddToCart(dress));
+        openModal(() => handleAddToCart(dress), `/dress/${dress.id}`);
       } else {
         addToCart({
           id: dress.id,
@@ -556,7 +556,7 @@ const Landing = () => {
                   <Card key={shop.id} className="min-w-[320px] flex-shrink-0 snap-start group hover:shadow-xl transition-all duration-300 border-0 shadow-md bg-white">
                     <div className="block cursor-pointer" onClick={() => {
                       // Temporarily force modal to open for testing
-                      openModal(() => navigate(`/shop/${shop.id}`));
+                      openModal(() => navigate(`/shop/${shop.id}`), `/shop/${shop.id}`);
                     }}>
                       <div className="relative overflow-hidden rounded-t-xl">
                         <img
@@ -647,7 +647,7 @@ const Landing = () => {
                             onClick={() => {
                               supabase.auth.getSession().then(({ data }) => {
                                 if (!data.session) {
-                                  openModal(() => openQuickView(dress));
+                                  openModal(() => openQuickView(dress), `/dress/${dress.id}`);
                                 } else {
                                   openQuickView(dress);
                                 }
@@ -801,7 +801,7 @@ const Landing = () => {
                               onClick={() => {
                                 supabase.auth.getSession().then(({ data }) => {
                                   if (!data.session) {
-                                    openModal(() => openQuickView(dress));
+                                    openModal(() => openQuickView(dress), `/dress/${dress.id}`);
                                   } else {
                                     openQuickView(dress);
                                   }
@@ -1019,7 +1019,7 @@ const Landing = () => {
                   <p className="text-sm text-gray-500">{shop.location}</p>
               <Button className="mt-4 w-full bg-gradient-to-r from-primary to-primary/80 text-white hover:from-primary/90 hover:to-primary/70"
                 onClick={() => {
-                  openModal(() => navigate(`/shop/${shop.id}`));
+                  openModal(() => navigate(`/shop/${shop.id}`), `/shop/${shop.id}`);
                 }}
               >
                 View Shop
