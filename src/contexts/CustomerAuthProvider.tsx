@@ -137,7 +137,7 @@ export const CustomerAuthProvider = ({ children }: { children: ReactNode }) => {
           // Set session and user state
           setSession(session);
           setUser(session?.user ?? null);
-  
+
           // Fetch customer profile if user exists
           if (session?.user) {
             const profile = await fetchCustomerProfile(session.user.id);
@@ -145,18 +145,24 @@ export const CustomerAuthProvider = ({ children }: { children: ReactNode }) => {
           } else {
             setCustomerProfile(null);
           }
-  
+
           // Handle OAuth user profile creation if user just signed in
           if (session?.user && _event === 'SIGNED_IN') {
             await handleOAuthUserProfile(session.user);
             
-            // Check for post-auth redirect
-            const postAuthRedirect = localStorage.getItem('post_auth_redirect');
-            if (postAuthRedirect) {
-              localStorage.removeItem('post_auth_redirect');
+            // Handle post-authentication redirect using our new utility
+            const { RedirectStateStorage } = await import('@/lib/authGuard');
+            const redirectState = RedirectStateStorage.getRedirectPath();
+            
+            if (redirectState) {
+              const targetPath = redirectState.search 
+                ? `${redirectState.path}${redirectState.search}`
+                : redirectState.path;
+              
+              RedirectStateStorage.clearRedirectPath();
               // Use setTimeout to ensure the redirect happens after the auth state is fully established
               setTimeout(() => {
-                window.location.href = postAuthRedirect;
+                window.location.href = targetPath;
               }, 100);
             }
           }

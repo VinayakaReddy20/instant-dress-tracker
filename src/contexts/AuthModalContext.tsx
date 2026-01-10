@@ -25,10 +25,24 @@ export const AuthModalProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const executeCallbackAndRedirect = async () => {
+    if (callback) {
+      callback();
+    }
+    if (redirectPath) {
+      // Store redirect path using our new utility
+      const { RedirectStateStorage } = await import('@/lib/authGuard');
+      RedirectStateStorage.setRedirectPath({
+        path: redirectPath,
+        search: window.location.search || undefined,
+      });
+    }
+    closeModal();
+  };
+
   return (
-    <AuthModalContext.Provider value={{ isOpen, openModal, closeModal, executeCallback, redirectPath }}>
+    <AuthModalContext.Provider value={{ isOpen, openModal, closeModal, executeCallback, executeCallbackAndRedirect, redirectPath }}>
       {children}
     </AuthModalContext.Provider>
   );
 };
-

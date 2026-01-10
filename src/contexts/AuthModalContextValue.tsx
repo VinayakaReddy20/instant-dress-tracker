@@ -5,6 +5,7 @@ export interface AuthModalContextType {
   openModal: (callback: () => void, redirectPath?: string) => void;
   closeModal: () => void;
   executeCallback: () => void;
+  executeCallbackAndRedirect: () => void;
   redirectPath: string | null;
 }
 

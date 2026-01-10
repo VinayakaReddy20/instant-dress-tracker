@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { supabase } from "@/integrations/supabaseClient";
 import { toast } from "@/components/ui/sonner";
 import { AuthError } from "@supabase/supabase-js";
-import { loginSchema, signupSchema, forgotPasswordSchema, type LoginFormData, type SignupFormData, type ForgotPasswordFormData } from "@/lib/validations";
+import { loginSchema, signupSchema, type LoginFormData, type SignupFormData } from "@/lib/validations";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,22 +19,25 @@ interface CustomerAuthModalProps {
 
 const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }) => {
   const [isLogin, setIsLogin] = useState(true);
-  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const { executeCallback, redirectPath } = useAuthModal();
   const navigate = useNavigate();
 
-  const form = useForm<LoginFormData | SignupFormData | ForgotPasswordFormData>({
-    resolver: zodResolver(isForgotPassword ? forgotPasswordSchema : isLogin ? loginSchema : signupSchema),
+  const form = useForm<LoginFormData | SignupFormData>({
+    resolver: zodResolver(isLogin ? loginSchema : signupSchema),
   });
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
-      // Store the intended redirect path in localStorage for OAuth flow
+      // Store the intended redirect path using our new utility
       if (redirectPath) {
-        localStorage.setItem('post_auth_redirect', redirectPath);
+        const { RedirectStateStorage } = await import('@/lib/authGuard');
+        RedirectStateStorage.setRedirectPath({
+          path: redirectPath,
+          search: window.location.search || undefined,
+        });
       }
       
       const { error } = await supabase.auth.signInWithOAuth({
@@ -53,24 +56,10 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }
     }
   };
 
-  const onSubmit = async (data: LoginFormData | SignupFormData | ForgotPasswordFormData) => {
+  const onSubmit = async (data: LoginFormData | SignupFormData) => {
     setIsLoading(true);
 
-    if (isForgotPassword) {
-      try {
-        const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
-          redirectTo: `${window.location.origin}/reset-password`,
-        });
-        if (error) throw error;
-        toast.success("Password reset email sent! Check your inbox.");
-        setIsForgotPassword(false);
-      } catch (err) {
-        console.error("Forgot password error:", err);
-        toast.error("Failed to send reset email. Please try again.");
-      } finally {
-        setIsLoading(false);
-      }
-    } else if (isLogin) {
+    if (isLogin) {
       const loginData = data as LoginFormData;
       try {
         const { data: authData, error } = await supabase.auth.signInWithPassword({
@@ -124,14 +113,9 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }
           }
 
           toast.success("Login successful!");
-          
-          // Redirect to the intended page if specified
-          if (redirectPath) {
-            navigate(redirectPath);
-          } else {
-            // If no redirect path, execute the callback
-            executeCallback();
-          }
+
+          // Execute the callback to navigate and close modal
+          executeCallback();
         }
       } catch (err) {
         console.error("Login error:", err);
@@ -202,14 +186,12 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }
             </svg>
           </div>
           <h2 className="text-3xl font-playfair font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
-            {isForgotPassword ? "Reset Password" : isLogin ? "Welcome Back!" : "Join DressTracker"}
+            {isLogin ? "Welcome Back!" : "Join DressTracker"}
           </h2>
           <p className="text-gray-600 text-sm mt-2 text-center">
-            {isForgotPassword
-              ? "Enter your email to receive a reset link"
-              : isLogin
-                ? "Sign in to shop amazing dresses"
-                : "Start your fashion journey today"
+            {isLogin
+              ? "Sign in to shop amazing dresses"
+              : "Start your fashion journey today"
             }
           </p>
         </div>
@@ -247,7 +229,6 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }
               )}
             />
 
-            {!isForgotPassword && (
               <FormField
                 control={form.control}
                 name="password"
@@ -277,9 +258,8 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }
                   </FormItem>
                 )}
               />
-            )}
 
-            {!isLogin && !isForgotPassword && (
+            {!isLogin && (
               <>
                 <FormField
                   control={form.control}
@@ -328,40 +308,23 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }
             >
               {isLoading
                 ? "Processing..."
-                : isForgotPassword
-                  ? "Send Reset Link"
-                  : isLogin
-                    ? "Sign In"
-                    : "Create Account"
+                : isLogin
+                  ? "Sign In"
+                  : "Create Account"
               }
             </Button>
 
-            {isLogin && !isForgotPassword && (
-              <div className="text-center">
-                <Button
-                  type="button"
-                  variant="link"
-                  onClick={() => setIsForgotPassword(true)}
-                  className="text-primary hover:text-primary/80 font-medium text-sm"
-                >
-                  Forgot your password?
-                </Button>
-              </div>
-            )}
           </form>
         </Form>
 
         {/* Divider */}
-        {!isForgotPassword && (
-          <div className="flex items-center my-6">
-            <div className="flex-1 h-px bg-gray-200"></div>
-            <span className="px-4 text-gray-500 text-sm font-medium">OR</span>
-            <div className="flex-1 h-px bg-gray-200"></div>
-          </div>
-        )}
+        <div className="flex items-center my-6">
+          <div className="flex-1 h-px bg-gray-200"></div>
+          <span className="px-4 text-gray-500 text-sm font-medium">OR</span>
+          <div className="flex-1 h-px bg-gray-200"></div>
+        </div>
 
         {/* Google Sign-In Button */}
-        {!isForgotPassword && (
           <Button
             type="button"
             onClick={handleGoogleSignIn}
@@ -380,34 +343,18 @@ const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({ isOpen, onClose }
             )}
             {isGoogleLoading ? "Signing in..." : "Continue with Google"}
           </Button>
-        )}
 
         {/* Switch Form */}
-        {!isForgotPassword && (
-          <p className="text-center text-sm text-gray-600">
-            {isLogin ? "New to DressTracker?" : "Already have an account?"}{" "}
-            <Button
-              variant="link"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-primary hover:text-primary/80 font-semibold p-0 h-auto"
-            >
-              {isLogin ? "Create Account" : "Sign In"}
-            </Button>
-          </p>
-        )}
-
-        {isForgotPassword && (
-          <p className="text-center text-sm text-gray-600">
-            Remember your password?{" "}
-            <Button
-              variant="link"
-              onClick={() => setIsForgotPassword(false)}
-              className="text-primary hover:text-primary/80 font-semibold p-0 h-auto"
-            >
-              Back to Login
-            </Button>
-          </p>
-        )}
+        <p className="text-center text-sm text-gray-600">
+          {isLogin ? "New to DressTracker?" : "Already have an account?"}{" "}
+          <Button
+            variant="link"
+            onClick={() => setIsLogin(!isLogin)}
+            className="text-primary hover:text-primary/80 font-semibold p-0 h-auto"
+          >
+            {isLogin ? "Create Account" : "Sign In"}
+          </Button>
+        </p>
 
         {/* Button to navigate to Landing page */}
         <div className="mt-6 text-center">
