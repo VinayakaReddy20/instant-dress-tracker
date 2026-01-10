@@ -5,6 +5,7 @@ import { useAuthModal } from "./useAuthModal";
 import { useCustomerAuth } from "../hooks/useCustomerAuth";
 import { CartItem, CartContextType, SupabaseCartItem } from './CartTypes';
 import { CartContext } from './CartContextValue';
+import { stockValidationMiddleware } from "../lib/stockValidationMiddleware";
 
 export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -105,49 +106,39 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // Check if item already exists in Supabase cart
-      const { data: existingCartItem, error: fetchError } = await supabase
-        .from("cart")
-        .select("id, quantity")
-        .eq("user_id", user.id)
-        .eq("dress_id", item.id)
-        .single();
+      // Validate stock before adding to cart
+      const validation = await stockValidationMiddleware.validateStock(item.id, {
+        quantity: 1,
+        showToast: true,
+        throwOnError: false
+      });
 
-      if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
-
-      if (existingCartItem) {
-        // Update quantity
-        const { error: updateError } = await supabase
-          .from("cart")
-          .update({ quantity: existingCartItem.quantity + 1 })
-          .eq("id", existingCartItem.id);
-
-        if (updateError) throw updateError;
-      } else {
-        // Insert new item
-        const { error: insertError } = await supabase
-          .from("cart")
-          .insert({
-            user_id: user.id,
-            dress_id: item.id,
-            quantity: 1
-          });
-
-        if (insertError) throw insertError;
+      if (!validation.success) {
+        return; // Stock validation failed, don't proceed
       }
 
-      // Update local state
-      setCart((prevCart) => {
-        const existingItem = prevCart.find((i) => i.id === item.id);
-        if (existingItem) {
-          return prevCart.map((i) =>
-            i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
-          );
-        }
-        return [...prevCart, { ...item, quantity: 1 }];
-      });
+      // Use Supabase function for atomic operation with stock validation
+      const result = await stockValidationMiddleware.addToCartWithValidation(
+        user.id,
+        item.id,
+        1,
+        { showToast: true }
+      );
+
+      if (result.success) {
+        // Update local state
+        setCart((prevCart) => {
+          const existingItem = prevCart.find((i) => i.id === item.id);
+          if (existingItem) {
+            return prevCart.map((i) =>
+              i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+            );
+          }
+          return [...prevCart, { ...item, quantity: 1 }];
+        });
+      }
     } catch (error) {
-      console.error("Error adding to cart in Supabase:", error);
+      console.error("Error adding to cart:", error);
       toast({
         title: "Error",
         description: "Failed to add item to cart. Please try again.",
@@ -170,15 +161,46 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
     if (user) {
       try {
-        const { error } = await supabase
-          .from("cart")
-          .update({ quantity })
-          .eq("user_id", user.id)
-          .eq("dress_id", id);
+        // Validate stock before updating quantity
+        const validation = await stockValidationMiddleware.validateStock(id, {
+          quantity,
+          showToast: true,
+          throwOnError: false
+        });
 
-        if (error) throw error;
+        if (!validation.success) {
+          // Revert the local state change if validation fails
+          setCart((prevCart) =>
+            prevCart.map((item) =>
+              item.id === id ? { ...item, quantity: item.quantity } : item
+            )
+          );
+          return;
+        }
+
+        // Use Supabase function for atomic operation with stock validation
+        const result = await stockValidationMiddleware.updateCartQuantityWithValidation(
+          user.id,
+          id,
+          quantity,
+          { showToast: true }
+        );
+
+        if (!result.success) {
+          // Revert the local state change if the operation fails
+          setCart((prevCart) =>
+            prevCart.map((item) =>
+              item.id === id ? { ...item, quantity: item.quantity } : item
+            )
+          );
+        }
       } catch (error) {
-        console.error("Error updating quantity in Supabase:", error);
+        console.error("Error updating quantity:", error);
+        toast({
+          title: "Error",
+          description: "Failed to update cart quantity. Please try again.",
+          variant: "destructive"
+        });
       }
     }
   };

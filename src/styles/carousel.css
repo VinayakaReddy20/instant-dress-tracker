@@ -1,0 +1,141 @@
+/* Custom Carousel Styles */
+
+.carousel-item {
+  /* stylelint-disable */ /* CSS warning suppression for Tailwind @apply */
+  @apply transition-all duration-300 ease-out;
+  /* stylelint-enable */
+}
+
+.carousel-item:hover {
+  /* stylelint-disable */ /* CSS warning suppression for Tailwind @apply */
+  @apply scale-105 z-10;
+  /* stylelint-enable */
+}
+
+.carousel-item:not(:hover) {
+  /* stylelint-disable */ /* CSS warning suppression for Tailwind @apply */
+  @apply opacity-80;
+  /* stylelint-enable */
+}
+
+.carousel-content {
+  /* stylelint-disable */ /* CSS warning suppression for Tailwind @apply */
+  @apply will-change-transform;
+  /* stylelint-enable */
+}
+
+.carousel-arrow {
+  /* stylelint-disable */ /* CSS warning suppression for Tailwind @apply */
+  @apply transition-all duration-200 ease-in-out transform hover:scale-110 hover:shadow-xl;
+  /* stylelint-enable */
+}
+
+.carousel-arrow:disabled {
+  /* stylelint-disable */ /* CSS warning suppression for Tailwind @apply */
+  @apply opacity-50 cursor-not-allowed hover:scale-100;
+  /* stylelint-enable */
+}
+
+.carousel-dot {
+  /* stylelint-disable */ /* CSS warning suppression for Tailwind @apply */
+  @apply transition-all duration-200 ease-in-out transform hover:scale-125;
+  /* stylelint-enable */
+}
+
+.carousel-dot.active {
+  /* stylelint-disable */ /* CSS warning suppression for Tailwind @apply */
+  @apply scale-125 ring-2 ring-primary/50;
+  /* stylelint-enable */
+}
+
+/* Enhanced hover effects for cards */
+.card-hover {
+  /* stylelint-disable */ /* CSS warning suppression for Tailwind @apply */
+  @apply transition-all duration-300 ease-out;
+  /* stylelint-enable */
+}
+
+.card-hover:hover {
+  /* stylelint-disable */ /* CSS warning suppression for Tailwind @apply */
+  @apply transform -translate-y-2 shadow-2xl scale-105;
+  /* stylelint-enable */
+}
+
+/* Subtle shadow and border effects */
+.card-border {
+  /* stylelint-disable */ /* CSS warning suppression for Tailwind @apply */
+  @apply border border-gray-100/50 backdrop-blur-sm;
+  /* stylelint-enable */
+}
+
+.card-shadow {
+  /* stylelint-disable */ /* CSS warning suppression for Tailwind @apply */
+  @apply shadow-lg hover:shadow-2xl;
+  /* stylelint-enable */
+}
+
+/* Gradient overlays */
+.gradient-overlay {
+  /* stylelint-disable */ /* CSS warning suppression for Tailwind @apply */
+  @apply bg-gradient-to-t from-black/30 via-transparent to-transparent;
+  /* stylelint-enable */
+}
+
+/* Animation classes */
+.slide-in-left {
+  animation: slideInLeft 0.6s ease-out;
+}
+
+.slide-in-right {
+  animation: slideInRight 0.6s ease-out;
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Focus styles for accessibility */
+.carousel-arrow:focus {
+  /* stylelint-disable */ /* CSS warning suppression for Tailwind @apply */
+  /* stylelint-disable */ /* CSS warning suppression for Tailwind @apply */
+  @apply outline-none ring-2 ring-primary/50 ring-offset-2;
+  /* stylelint-enable */
+  /* stylelint-enable */
+}
+
+.carousel-dot:focus {
+  @apply outline-none ring-2 ring-primary/50 ring-offset-2;
+}
+
+/* Touch-friendly styles for mobile */
+@media (hover: none) and (pointer: coarse) {
+  .carousel-item {
+    /* stylelint-disable */ /* CSS warning suppression for Tailwind @apply */
+    @apply scale-100;
+    /* stylelint-enable */
+  }
+  
+  .card-hover:hover {
+    /* stylelint-disable */ /* CSS warning suppression for Tailwind @apply */
+    @apply transform-none shadow-lg scale-100;
+    /* stylelint-enable */
+  }
+}

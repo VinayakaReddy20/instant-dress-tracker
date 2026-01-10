@@ -8,8 +8,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { supabase } from "@/integrations/supabaseClient";
 import { DressFormData } from "@/pages/Dashboard";
-import { Image as ImageIcon, PlusCircle, Save, Camera } from "lucide-react";
+import { Image as ImageIcon, PlusCircle, Save, Camera, AlertCircle } from "lucide-react";
 import { dressFormSchema } from "@/lib/validations";
+import { toast } from "@/components/ui/use-toast";
 
 interface DressFormProps {
   initialData?: DressFormData;
@@ -55,6 +56,17 @@ const DressForm: React.FC<DressFormProps> = ({
 
   const onSubmit = async (data: DressFormData) => {
     const submitData = { ...data, shop_id: shopId };
+    
+    // Validate stock is not negative
+    if (submitData.stock !== undefined && submitData.stock < 0) {
+      toast({
+        title: "Invalid stock",
+        description: "Stock cannot be negative.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     try {
       if (data.id) {
         const { error } = await supabase
@@ -66,10 +78,25 @@ const DressForm: React.FC<DressFormProps> = ({
         const { error } = await supabase.from("dresses").insert(submitData);
         if (error) throw error;
       }
+      
+      // Show success message with stock information
+      const stockMessage = submitData.stock !== undefined
+        ? ` (Stock: ${submitData.stock})`
+        : "";
+      
+      toast({
+        title: data.id ? "Dress updated!" : "Dress added!",
+        description: `${data.name} has been ${data.id ? 'updated' : 'added'} successfully${stockMessage}`
+      });
+      
       onSave();
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error saving dress:", err);
-      alert("Failed to save dress. Please try again.");
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to save dress. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -229,6 +256,18 @@ const DressForm: React.FC<DressFormProps> = ({
                 aria-invalid={errors.stock ? "true" : "false"}
               />
               {errors.stock && <p className="text-red-600 text-sm mt-1">{errors.stock.message}</p>}
+              {watch("stock") !== undefined && watch("stock") < 5 && watch("stock") > 0 && (
+                <div className="flex items-center gap-2 mt-1 text-yellow-600 text-sm">
+                  <AlertCircle className="w-4 h-4" />
+                  Low stock alert: Only {watch("stock")} items available
+                </div>
+              )}
+              {watch("stock") === 0 && (
+                <div className="flex items-center gap-2 mt-1 text-red-600 text-sm">
+                  <AlertCircle className="w-4 h-4" />
+                  Warning: This dress will be out of stock
+                </div>
+              )}
             </div>
 
             <div>

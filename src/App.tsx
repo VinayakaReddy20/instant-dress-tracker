@@ -13,7 +13,6 @@ import ShopDetail from "./pages/ShopDetail";
 import Dashboard from "./pages/Dashboard";
 import SearchResults from "./pages/SearchResults";
 import NotFound from "./pages/NotFound";
-import ResetPassword from "./pages/ResetPassword";
 import CustomerProfile from "./pages/CustomerProfile";
 import AuthModal from "@/components/AuthModal";
 import CustomerAuthModal from "@/components/CustomerAuthModal";
@@ -93,7 +92,6 @@ const AppContent: React.FC = () => {
           <Route path="/search" element={<SearchResults />} />
           <Route path="/customer-auth" element={<CustomerAuth />} />
           <Route path="/profile" element={<CustomerProfile />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
 
           <Route
             path="/dashboard"

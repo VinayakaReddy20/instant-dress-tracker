@@ -155,9 +155,9 @@ const CustomerAuth = () => {
           <p className="text-sm text-center">
             <span
               className="text-blue-500 cursor-pointer"
-              onClick={() => navigate("/reset-password")}
+              onClick={() => navigate("/")}
             >
-              Forgot Password?
+              Back to Home
             </span>
           </p>
         )}

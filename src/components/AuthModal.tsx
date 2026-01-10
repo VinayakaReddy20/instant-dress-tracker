@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabaseClient";
 import { toast } from "@/components/ui/sonner";
 import { AuthError } from "@supabase/supabase-js";
 import { useNavigate } from "react-router-dom";
-import { loginSchema, signupSchema, forgotPasswordSchema, type LoginFormData, type SignupFormData, type ForgotPasswordFormData } from "@/lib/validations";
+import { loginSchema, signupSchema, type LoginFormData, type SignupFormData } from "@/lib/validations";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,14 +19,13 @@ interface AuthModalProps {
 
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
-  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const navigate = useNavigate();
 
-  const form = useForm<LoginFormData | SignupFormData | ForgotPasswordFormData>({
-    resolver: zodResolver(isForgotPassword ? forgotPasswordSchema : isLogin ? loginSchema : signupSchema),
+  const form = useForm<LoginFormData | SignupFormData>({
+    resolver: zodResolver(isLogin ? loginSchema : signupSchema),
   });
 
   const navigateToLanding = () => {
@@ -53,24 +52,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess }
     }
   };
 
-  const onSubmit = async (data: LoginFormData | SignupFormData | ForgotPasswordFormData) => {
+  const onSubmit = async (data: LoginFormData | SignupFormData) => {
     setIsLoading(true);
     
-    if (isForgotPassword) {
-      try {
-        const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
-          redirectTo: `${window.location.origin}/reset-password`,
-        });
-        if (error) throw error;
-        toast.success("Password reset email sent! Check your inbox.");
-        setIsForgotPassword(false);
-      } catch (err) {
-        console.error("Forgot password error:", err);
-        toast.error("Failed to send reset email. Please try again.");
-      } finally {
-        setIsLoading(false);
-      }
-    } else if (isLogin) {
+    if (isLogin) {
       const loginData = data as LoginFormData;
       try {
         const { data: authData, error } = await supabase.auth.signInWithPassword({
@@ -167,14 +152,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess }
             </svg>
           </div>
           <h2 className="text-3xl font-playfair font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
-            {isForgotPassword ? "Reset Password" : isLogin ? "Welcome Back!" : "Join DressTracker"}
+            {isLogin ? "Welcome Back!" : "Join DressTracker"}
           </h2>
           <p className="text-gray-600 text-sm mt-2 text-center">
-            {isForgotPassword 
-              ? "Enter your email to receive a reset link" 
-              : isLogin 
-                ? "Sign in to manage your boutique" 
-                : "Start your fashion journey today"
+            {isLogin
+              ? "Sign in to manage your boutique"
+              : "Start your fashion journey today"
             }
           </p>
         </div>
@@ -212,7 +195,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess }
               )}
             />
 
-            {!isForgotPassword && (
               <FormField
                 control={form.control}
                 name="password"
@@ -228,10 +210,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess }
                           className="pl-10 rounded-lg border-gray-300 focus:border-primary"
                           disabled={isLoading}
                         />
-                        <svg 
-                          className="absolute left-3 top-3 w-4 h-4 text-gray-400" 
-                          fill="none" 
-                          stroke="currentColor" 
+                        <svg
+                          className="absolute left-3 top-3 w-4 h-4 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
                           viewBox="0 0 24 24"
                         >
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -242,7 +224,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess }
                   </FormItem>
                 )}
               />
-            )}
 
             {/* Primary Button */}
             <Button
@@ -250,42 +231,25 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess }
               className="w-full bg-gradient-to-r from-primary to-primary/80 text-white py-2.5 rounded-lg font-semibold hover:from-primary/90 hover:to-primary/70 transition-all duration-200"
               disabled={isLoading}
             >
-              {isLoading 
-                ? "Processing..." 
-                : isForgotPassword 
-                  ? "Send Reset Link" 
-                  : isLogin 
-                    ? "Sign In" 
-                    : "Create Account"
+              {isLoading
+                ? "Processing..."
+                : isLogin
+                  ? "Sign In"
+                  : "Create Account"
               }
             </Button>
 
-            {isLogin && !isForgotPassword && (
-              <div className="text-center">
-                <Button
-                  type="button"
-                  variant="link"
-                  onClick={() => setIsForgotPassword(true)}
-                  className="text-primary hover:text-primary/80 font-medium text-sm"
-                >
-                  Forgot your password?
-                </Button>
-              </div>
-            )}
           </form>
         </Form>
 
         {/* Divider */}
-        {!isForgotPassword && (
-          <div className="flex items-center my-6">
-            <div className="flex-1 h-px bg-gray-200"></div>
-            <span className="px-4 text-gray-500 text-sm font-medium">OR</span>
-            <div className="flex-1 h-px bg-gray-200"></div>
-          </div>
-        )}
+        <div className="flex items-center my-6">
+          <div className="flex-1 h-px bg-gray-200"></div>
+          <span className="px-4 text-gray-500 text-sm font-medium">OR</span>
+          <div className="flex-1 h-px bg-gray-200"></div>
+        </div>
 
         {/* Google Sign-In Button */}
-        {!isForgotPassword && (
           <Button
             type="button"
             onClick={handleGoogleSignIn}
@@ -304,34 +268,18 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess }
             )}
             {isGoogleLoading ? "Signing in..." : "Continue with Google"}
           </Button>
-        )}
 
         {/* Switch Form */}
-        {!isForgotPassword && (
-          <p className="text-center text-sm text-gray-600">
-            {isLogin ? "New to DressTracker?" : "Already have an account?"}{" "}
-            <Button
-              variant="link"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-primary hover:text-primary/80 font-semibold p-0 h-auto"
-            >
-              {isLogin ? "Create Account" : "Sign In"}
-            </Button>
-          </p>
-        )}
-
-        {isForgotPassword && (
-          <p className="text-center text-sm text-gray-600">
-            Remember your password?{" "}
-            <Button
-              variant="link"
-              onClick={() => setIsForgotPassword(false)}
-              className="text-primary hover:text-primary/80 font-semibold p-0 h-auto"
-            >
-              Back to Login
-            </Button>
-          </p>
-        )}
+        <p className="text-center text-sm text-gray-600">
+          {isLogin ? "New to DressTracker?" : "Already have an account?"}{" "}
+          <Button
+            variant="link"
+            onClick={() => setIsLogin(!isLogin)}
+            className="text-primary hover:text-primary/80 font-semibold p-0 h-auto"
+          >
+            {isLogin ? "Create Account" : "Sign In"}
+          </Button>
+        </p>
 
         {/* Button to navigate to Landing page */}
         <div className="mt-6 text-center">

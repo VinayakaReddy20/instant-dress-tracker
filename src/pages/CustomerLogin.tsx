@@ -235,9 +235,9 @@ const CustomerLogin: React.FC = () => {
               <button
                 type="button"
                 className="text-sm text-primary hover:text-primary/80 font-medium"
-                onClick={() => navigate('/reset-password')}
+                onClick={() => navigate('/')}
               >
-                Forgot password?
+                Back to Home
               </button>
             </div>
 

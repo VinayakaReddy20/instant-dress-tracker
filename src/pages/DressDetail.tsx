@@ -4,6 +4,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabaseClient";
 import { useCart } from "@/hooks/useCart";
 import { useAuthModal } from "@/contexts/useAuthModal";
+import { useStockValidation } from "@/hooks/useStockValidation";
+import { stockValidationMiddleware } from "@/lib/stockValidationMiddleware";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -33,8 +35,10 @@ const DressDetail = () => {
   const { dressId } = useParams<{ dressId: string }>();
   const navigate = useNavigate();
   const { addToCart } = useCart();
+  const { validateStock } = useStockValidation();
   const [dress, setDress] = useState<DressDetailType | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   useEffect(() => {
     const fetchDress = async () => {
@@ -66,30 +70,78 @@ const DressDetail = () => {
   // Customer authentication check for addToCart
   const { openModal } = useAuthModal();
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!dress) return;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) {
-        // Open auth modal with redirect back to this dress detail page
-        openModal(() => handleAddToCart(), `/dress/${dress.id}`);
-      } else {
-        addToCart({
-          id: dress.id,
-          name: dress.name,
-          price: dress.price,
-          size: dress.size,
-          color: dress.color || undefined,
-          category: dress.category || undefined,
-          image_url: dress.image_url || undefined,
-          shop_id: dress.shop_id,
-          shop: dress.shops && dress.shops.location ? { name: dress.shops.name, location: dress.shops.location } : undefined
-        });
-        toast({
-          title: "Added to cart!",
-          description: `${dress.name} has been added to your cart.`,
-        });
-      }
-    });
+    
+    // Check if dress is out of stock before proceeding
+    if (dress.stock !== null && dress.stock <= 0) {
+      toast({
+        title: "Cannot add to cart",
+        description: "This dress is currently out of stock",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsAddingToCart(true);
+
+    try {
+      supabase.auth.getSession().then(async ({ data }) => {
+        if (!data.session) {
+          // Open auth modal with redirect back to this dress detail page
+          openModal(() => handleAddToCart(), `/dress/${dress.id}`);
+          setIsAddingToCart(false);
+        } else {
+          try {
+            // Validate stock before adding to cart
+            const validation = await validateStock(dress.id, 1);
+            
+            if (!validation.isValid) {
+              toast({
+                title: "Cannot add to cart",
+                description: validation.message,
+                variant: "destructive"
+              });
+              setIsAddingToCart(false);
+              return;
+            }
+
+            addToCart({
+              id: dress.id,
+              name: dress.name,
+              price: dress.price,
+              size: dress.size,
+              color: dress.color || undefined,
+              category: dress.category || undefined,
+              image_url: dress.image_url || undefined,
+              shop_id: dress.shop_id,
+              shop: dress.shops && dress.shops.location ? { name: dress.shops.name, location: dress.shops.location } : undefined
+            });
+            toast({
+              title: "Added to cart!",
+              description: `${dress.name} has been added to your cart.`,
+            });
+          } catch (error) {
+            console.error("Error adding to cart:", error);
+            toast({
+              title: "Error",
+              description: "Failed to add item to cart. Please try again.",
+              variant: "destructive"
+            });
+          } finally {
+            setIsAddingToCart(false);
+          }
+        }
+      });
+    } catch (error) {
+      console.error("Error in handleAddToCart:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive"
+      });
+      setIsAddingToCart(false);
+    }
   };
 
   if (loading) {
@@ -167,10 +219,11 @@ const DressDetail = () => {
             <Button
               className="w-full"
               onClick={handleAddToCart}
-              disabled={!dress.stock || dress.stock <= 0}
+              disabled={!dress.stock || dress.stock <= 0 || isAddingToCart}
+              isLoading={isAddingToCart}
             >
               <ShoppingCart className="w-4 h-4 mr-2" />
-              {dress.stock && dress.stock > 0 ? "Add to Cart" : "Out of Stock"}
+              {isAddingToCart ? "Adding..." : (dress.stock && dress.stock > 0 ? "Add to Cart" : "Out of Stock")}
             </Button>
           </div>
         </div>

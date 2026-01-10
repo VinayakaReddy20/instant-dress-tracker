@@ -12,10 +12,13 @@ import Footer from "@/components/Footer";
 import heroBoutique from "@/assets/hero-boutique.jpg";
 import { supabase } from "@/integrations/supabaseClient";
 import { useCart } from "@/hooks/useCart";
-import { useAuthModal } from "@/contexts/useAuthModal";
+import { useAuthGuard } from "@/lib/authGuard";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { debugLog, logApiError } from "@/lib/errorHandling";
+import { Carousel, CarouselContent, CarouselItem } from "@/components/ui/carousel";
+import { DressCard } from "@/components/DressCard";
+import { ShopCard } from "@/components/ShopCard";
 
 import type { Database } from "@/types";
 
@@ -64,7 +67,7 @@ const Landing = () => {
   const uniqueSizes = [...new Set(dresses.map(d => d.size))];
   const uniqueColors = [...new Set(dresses.map(d => d.color).filter(Boolean))] as string[];
 
-  const shopsRef = useRef<HTMLDivElement>(null);
+  // const shopsRef = useRef<HTMLDivElement>(null); // Deprecated - using carousel now
 
   // Helper function to check if a dress is new (created within last 30 days)
   const isNewDress = (dress: Dress) => {
@@ -80,8 +83,7 @@ const Landing = () => {
   const fetchShops = async () => {
     const { data, error } = await supabase
       .from("shops")
-      .select("id, name, location, image_url, rating, review_count")
-      .limit(10);
+      .select("id, name, location, image_url, rating, review_count");
     if (error) return console.error(error);
     if (data) setShops(data as Shop[]);
   };
@@ -329,12 +331,12 @@ const Landing = () => {
     setCurrentPage(1);
   }, [searchQuery, selectedCategories, selectedSizes, selectedColors, priceRange, sortOption]);
 
-  // Scroll handler
-  const scroll = (ref: React.RefObject<HTMLDivElement>, direction: "left" | "right") => {
-    if (!ref.current) return;
-    const scrollAmount = ref.current.offsetWidth * 0.7;
-    ref.current.scrollBy({ left: direction === "left" ? -scrollAmount : scrollAmount, behavior: "smooth" });
-  };
+  // Scroll handler (deprecated - using carousel now)
+  // const scroll = (ref: React.RefObject<HTMLDivElement>, direction: "left" | "right") => {
+  //   if (!ref.current) return;
+  //   const scrollAmount = ref.current.offsetWidth * 0.7;
+  //   ref.current.scrollBy({ left: direction === "left" ? -scrollAmount : scrollAmount, behavior: "smooth" });
+  // };
 
   const openQuickView = (dress: Dress) => {
     setSelectedDress(dress);
@@ -356,33 +358,29 @@ const Landing = () => {
                              (priceRange[0] > 0 || priceRange[1] < 10000 ? 1 : 0);
 
   // Customer authentication check for addToCart
-  const { openModal } = useAuthModal();
+  const { protectRoute } = useAuthGuard();
 
   const handleAddToCart = (dress: Dress) => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) {
-        openModal(() => handleAddToCart(dress), `/dress/${dress.id}`);
-      } else {
-        addToCart({
-          id: dress.id,
-          name: dress.name,
-          price: dress.price || 0,
-          size: dress.size,
-          color: dress.color || undefined,
-          category: dress.category || undefined,
-          image_url: dress.image_url || undefined,
-          shop_id: dress.shop_id,
-          shop: dress.shops ? {
-            name: dress.shops.name,
-            location: dress.shops.location || ""
-          } : undefined,
-        });
-        toast({
-          title: "Added to cart!",
-          description: `${dress.name} has been added to your cart.`,
-        });
-      }
-    });
+    protectRoute(() => {
+      addToCart({
+        id: dress.id,
+        name: dress.name,
+        price: dress.price || 0,
+        size: dress.size,
+        color: dress.color || undefined,
+        category: dress.category || undefined,
+        image_url: dress.image_url || undefined,
+        shop_id: dress.shop_id,
+        shop: dress.shops ? {
+          name: dress.shops.name,
+          location: dress.shops.location || ""
+        } : undefined,
+      });
+      toast({
+        title: "Added to cart!",
+        description: `${dress.name} has been added to your cart.`,
+      });
+    }, `/dress/${dress.id}`);
   };
 
   // Animation variants
@@ -531,32 +529,14 @@ const Landing = () => {
                   <h2 className="text-2xl font-bold text-gray-900 mb-1">Shops ({filteredShops.length})</h2>
                   <p className="text-sm text-gray-600">Discover boutiques in your area</p>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => scroll(shopsRef, "left")}
-                    className="border-gray-300 hover:bg-gray-50"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => scroll(shopsRef, "right")}
-                    className="border-gray-300 hover:bg-gray-50"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                </div>
+                {/* Carousel controls are now handled by the Carousel component */}
               </div>
 
-              <div ref={shopsRef} className="flex space-x-6 overflow-x-auto scroll-smooth snap-x scrollbar-hide py-4">
+              <div className="space-y-6">
                 {filteredShops.map((shop) => (
                   <Card key={shop.id} className="min-w-[320px] flex-shrink-0 snap-start group hover:shadow-xl transition-all duration-300 border-0 shadow-md bg-white">
                     <div className="block cursor-pointer" onClick={() => {
-                      // Temporarily force modal to open for testing
-                      openModal(() => navigate(`/shop/${shop.id}`), `/shop/${shop.id}`);
+                      protectRoute(() => navigate(`/shop/${shop.id}`), `/shop/${shop.id}`);
                     }}>
                       <div className="relative overflow-hidden rounded-t-xl">
                         <img
@@ -614,15 +594,18 @@ const Landing = () => {
                   {paginatedDresses.map((dress) => (
                     <Card key={dress.id} className="group overflow-hidden border-0 shadow-md hover:shadow-xl transition-all duration-300 bg-white">
                       <div className="relative overflow-hidden">
-                        <Link to={`/dress/${dress.id}`}>
-                          <div className="aspect-[3/4] overflow-hidden">
-                            <img
-                              src={dress.image_url || "https://via.placeholder.com/300x400?text=Dress+Image"}
-                              alt={dress.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                            />
-                          </div>
-                        </Link>
+                        <div
+                          className="aspect-[3/4] overflow-hidden cursor-pointer"
+                          onClick={() => {
+                            protectRoute(() => navigate(`/dress/${dress.id}`), `/dress/${dress.id}`);
+                          }}
+                        >
+                          <img
+                            src={dress.image_url || "https://via.placeholder.com/300x400?text=Dress+Image"}
+                            alt={dress.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
+                        </div>
 
                         {/* Badges */}
                         <div className="absolute top-3 left-3 flex flex-col gap-2">
@@ -645,13 +628,7 @@ const Landing = () => {
                             size="sm"
                             className="bg-white hover:bg-gray-50 text-gray-900 font-medium shadow-lg"
                             onClick={() => {
-                              supabase.auth.getSession().then(({ data }) => {
-                                if (!data.session) {
-                                  openModal(() => openQuickView(dress), `/dress/${dress.id}`);
-                                } else {
-                                  openQuickView(dress);
-                                }
-                              });
+                              protectRoute(() => openQuickView(dress), `/dress/${dress.id}`);
                             }}
                           >
                             <Eye className="w-4 h-4 mr-2" />
@@ -672,11 +649,14 @@ const Landing = () => {
                         </div>
 
                         {/* Product Name */}
-                        <Link to={`/dress/${dress.id}`}>
-                          <h3 className="font-semibold text-gray-900 line-clamp-2 mb-2 group-hover:text-primary transition-colors text-sm leading-tight">
-                            {dress.name}
-                          </h3>
-                        </Link>
+                        <h3
+                          className="font-semibold text-gray-900 line-clamp-2 mb-2 group-hover:text-primary transition-colors text-sm leading-tight cursor-pointer"
+                          onClick={() => {
+                            protectRoute(() => navigate(`/dress/${dress.id}`), `/dress/${dress.id}`);
+                          }}
+                        >
+                          {dress.name}
+                        </h3>
 
                         {/* Shop Info */}
                         <p className="text-xs text-gray-600 flex items-center mb-3">
@@ -799,13 +779,7 @@ const Landing = () => {
                               size="sm"
                               className="px-4 border-gray-300 hover:bg-gray-50"
                               onClick={() => {
-                                supabase.auth.getSession().then(({ data }) => {
-                                  if (!data.session) {
-                                    openModal(() => openQuickView(dress), `/dress/${dress.id}`);
-                                  } else {
-                                    openQuickView(dress);
-                                  }
-                                });
+                                protectRoute(() => openQuickView(dress), `/dress/${dress.id}`);
                               }}
                             >
                               <Eye className="w-4 h-4" />
@@ -957,76 +931,77 @@ const Landing = () => {
       </motion.section>
 
       {/* New Arrivals */}
-<section className="py-20 bg-white">
-  <div className="container mx-auto px-4">
-    <h2 className="text-3xl font-playfair font-bold text-center mb-12">New Arrivals</h2>
+      <section className="py-20 bg-white">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-playfair font-bold text-center mb-12">Recently Added Dresses</h2>
 
-    {dresses.length > 0 ? (
-      <div className={`grid ${isMobile ? 'grid-cols-1 sm:grid-cols-2' : 'md:grid-cols-3 lg:grid-cols-4'} gap-8`}>
-        {dresses
-          // Sort by created_at (latest first)
-          .sort((a, b) => {
-  const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-  const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-  return dateB - dateA;
-})
-          // Show only the top 4 new arrivals
-          .slice(0, 4)
-          .map((dress) => (
-            <div
-              key={dress.id}
-              className="border rounded-2xl p-4 shadow-lg hover:shadow-2xl transition-all duration-300 bg-white/80 backdrop-blur-sm"
+          {dresses.length > 0 ? (
+            <Carousel
+              showArrows={true}
+              showDots={true}
+              autoPlay={true}
+              autoPlayInterval={5000}
+              responsive={{
+                desktop: 4,
+                tablet: 3,
+                mobile: 1,
+              }}
+              className="w-full"
             >
-              <img
-                src={dress.image_url || "https://via.placeholder.com/300x400?text=Dress+Image"}
-                alt={dress.name}
-                className="w-full h-56 object-cover rounded-xl"
-              />
-              <h3 className="mt-4 font-semibold text-lg">{dress.name}</h3>
-              <p className="text-sm text-gray-500">
-                {dress.shops?.name} • {dress.shops?.location}
-              </p>
-              <div className="flex justify-between items-center mt-2">
-                <span className="font-bold text-primary">
-                  ₹{(dress.price || 0).toLocaleString("en-IN")}
-                </span>
-                <Badge variant="outline">{dress.size}</Badge>
-              </div>
-              <Button className="mt-3 w-full bg-gradient-to-r from-primary to-primary/80 text-white hover:from-primary/90 hover:to-primary/70"
-                onClick={() => { handleAddToCart(dress); }}
-              >
-                Add to Cart
-              </Button>
-            </div>
-          ))}
-      </div>
-    ) : (
-      <p className="text-center text-gray-500">No dresses available</p>
-    )}
-  </div>
-</section>
+              <CarouselContent>
+                {dresses
+                  // Sort by created_at (latest first)
+                  .sort((a, b) => {
+                    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                    return dateB - dateA;
+                  })
+                  .map((dress) => (
+                    <CarouselItem key={dress.id}>
+                      <DressCard
+                        dress={dress}
+                        onQuickView={openQuickView}
+                      />
+                    </CarouselItem>
+                  ))}
+              </CarouselContent>
+            </Carousel>
+          ) : (
+            <p className="text-center text-gray-500">No dresses available</p>
+          )}
+        </div>
+      </section>
 
       {/* Featured Shops */}
       <section className="py-20 bg-white">
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-playfair font-bold text-center mb-12">Featured Shops</h2>
           {shops.length > 0 ? (
-            <div className="grid md:grid-cols-3 gap-8">
-              {shops.map((shop) => (
-                <div key={shop.id} className="border rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 bg-white/80 backdrop-blur-sm">
-                  <img src={shop.image_url || "https://via.placeholder.com/400x300?text=Shop+Image"} alt={shop.name} className="w-full h-40 object-cover rounded-xl" />
-                  <h3 className="text-xl font-semibold mt-4">{shop.name}</h3>
-                  <p className="text-sm text-gray-500">{shop.location}</p>
-              <Button className="mt-4 w-full bg-gradient-to-r from-primary to-primary/80 text-white hover:from-primary/90 hover:to-primary/70"
-                onClick={() => {
-                  openModal(() => navigate(`/shop/${shop.id}`), `/shop/${shop.id}`);
-                }}
-              >
-                View Shop
-              </Button>
-                </div>
-              ))}
-            </div>
+            <Carousel
+              showArrows={true}
+              showDots={true}
+              autoPlay={true}
+              autoPlayInterval={4000}
+              responsive={{
+                desktop: 3,
+                tablet: 2,
+                mobile: 1,
+              }}
+              className="w-full"
+            >
+              <CarouselContent>
+                {shops.map((shop) => (
+                  <CarouselItem key={shop.id}>
+                    <ShopCard
+                      shop={shop}
+                      onViewShop={(shop) => {
+                        protectRoute(() => navigate(`/shop/${shop.id}`), `/shop/${shop.id}`);
+                      }}
+                    />
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+            </Carousel>
           ) : (
             <p className="text-center text-gray-500">No shops available</p>
           )}

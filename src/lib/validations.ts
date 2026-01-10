@@ -28,9 +28,6 @@ export const signupSchema = z.object({
   phone: z.string().regex(/^[+]?[1-9][\d]{0,15}$/, "Please enter a valid phone number").optional().or(z.literal("")),
 });
 
-export const forgotPasswordSchema = z.object({
-  email: emailSchema,
-});
 
 // Dress form validation schema
 export const dressFormSchema = z.object({
@@ -139,7 +136,6 @@ export const searchSchema = z.object({
 
 export type LoginFormData = z.infer<typeof loginSchema>;
 export type SignupFormData = z.infer<typeof signupSchema>;
-export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 export type DressFormData = z.infer<typeof dressFormSchema>;
 export type ShopFormData = z.infer<typeof shopFormSchema>;
 export type SearchFormData = z.infer<typeof searchSchema>;
