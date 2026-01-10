@@ -9,6 +9,7 @@ import { useToast } from '../components/ui/use-toast';
 import { Loader2, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { loginSchema } from '../lib/validations';
 import { z } from 'zod';
+import { supabase } from '../integrations/supabaseClient';
 
 const CustomerLogin: React.FC = () => {
   const navigate = useNavigate();
@@ -91,26 +92,52 @@ const CustomerLogin: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const { data, error } = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      }).then(res => res.json());
-
-      if (error) {
-        throw new Error(error.message || 'Login failed');
-      }
-
-      toast({
-        title: "Welcome back!",
-        description: "You have successfully logged in.",
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
       });
 
-      // Redirect to intended page or profile
-      const from = location.state?.from?.pathname || '/profile';
-      navigate(from, { replace: true });
+      if (error) {
+        throw error;
+      }
+
+      if (authData.user) {
+        // Check if customer profile exists
+        const { data: customerData, error: fetchError } = await supabase
+          .from("customers")
+          .select("id")
+          .eq("user_id", authData.user.id)
+          .single();
+
+        if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "not found"
+          throw new Error("Failed to verify customer profile");
+        }
+
+        if (!customerData) {
+          // Create customer profile on first login
+          const { error: insertError } = await supabase
+            .from("customers")
+            .insert({
+              user_id: authData.user.id,
+              email: authData.user.email || formData.email,
+              full_name: authData.user.user_metadata?.full_name || "",
+              phone: authData.user.user_metadata?.phone || "",
+            });
+
+          if (insertError) {
+            console.error("Error creating customer profile:", insertError);
+          }
+        }
+
+        toast({
+          title: "Welcome back!",
+          description: "You have successfully logged in.",
+        });
+
+        // Redirect to intended page or profile
+        const from = location.state?.from?.pathname || '/profile';
+        navigate(from, { replace: true });
+      }
 
     } catch (error) {
       toast({

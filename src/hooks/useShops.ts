@@ -102,31 +102,35 @@ export const useShops = (filters?: ShopFilters) => {
         "postgres_changes",
         { event: "*", schema: "public", table: "shops" },
         (payload) => {
-          const newShop = payload.new as Shop;
-          const oldShop = payload.old as Shop;
+          try {
+            const newShop = payload.new as Shop;
+            const oldShop = payload.old as Shop;
 
-          switch (payload.eventType) {
-            case "INSERT":
-              if (newShop) {
-                setShops((prev) =>
-                  prev.some((s) => s.id === newShop.id)
-                    ? prev
-                    : [newShop, ...prev]
-                );
-              }
-              break;
-            case "UPDATE":
-              if (newShop) {
-                setShops((prev) =>
-                  prev.map((s) => (s.id === newShop.id ? newShop : s))
-                );
-              }
-              break;
-            case "DELETE":
-              if (oldShop) {
-                setShops((prev) => prev.filter((s) => s.id !== oldShop.id));
-              }
-              break;
+            switch (payload.eventType) {
+              case "INSERT":
+                if (newShop) {
+                  setShops((prev) =>
+                    prev.some((s) => s.id === newShop.id)
+                      ? prev
+                      : [newShop, ...prev]
+                  );
+                }
+                break;
+              case "UPDATE":
+                if (newShop) {
+                  setShops((prev) =>
+                    prev.map((s) => (s.id === newShop.id ? newShop : s))
+                  );
+                }
+                break;
+              case "DELETE":
+                if (oldShop) {
+                  setShops((prev) => prev.filter((s) => s.id !== oldShop.id));
+                }
+                break;
+            }
+          } catch (error) {
+            console.error("Error handling realtime shop update:", error);
           }
         }
       )

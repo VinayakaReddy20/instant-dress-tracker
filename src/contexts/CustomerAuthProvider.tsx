@@ -1,7 +1,7 @@
 import React, { useContext, useState, useEffect, ReactNode, useRef } from "react";
 import { supabase } from "../integrations/supabaseClient";
 import { User, Session, AuthChangeEvent, AuthError } from "@supabase/supabase-js";
-import { CustomerAuthContext } from "./CustomerAuthContext";
+import { CustomerAuthContext, CustomerAuthContextType, CustomerProfile } from "./CustomerAuthContext";
 
 const handleOAuthUserProfile = async (user: User) => {
   try {
@@ -44,9 +44,30 @@ const handleOAuthUserProfile = async (user: User) => {
   }
 };
 
+const fetchCustomerProfile = async (userId: string): Promise<CustomerProfile | null> => {
+  try {
+    const { data, error } = await supabase
+      .from("customers")
+      .select("*")
+      .eq("user_id", userId)
+      .single();
+
+    if (error) {
+      console.error("Error fetching customer profile:", error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Error fetching customer profile:", error);
+    return null;
+  }
+};
+
 export const CustomerAuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Refs to prevent duplicate auth checks and ensure loading always resolves
@@ -81,22 +102,14 @@ export const CustomerAuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        // Check if session is expired
-        if (session && session.expires_at && session.expires_at < Date.now() / 1000) {
-          console.log("CustomerAuthProvider: Session expired, clearing...");
-          // Clear local storage
-          localStorage.removeItem('supabase.auth.token');
-          const supabaseKey = (import.meta.env.VITE_SUPABASE_URL || '').split('.')[0].split('//')[1];
-          if (supabaseKey) {
-            localStorage.removeItem('sb-' + supabaseKey + '-auth-token');
-          }
-          sessionStorage.clear();
-          supabase.auth.signOut({ scope: 'local' });
-          setSession(null);
-          setUser(null);
-        } else {
-          setSession(session);
-          setUser(session?.user ?? null);
+        // Set session and user state
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // Fetch customer profile if user exists
+        if (session?.user) {
+          const profile = await fetchCustomerProfile(session.user.id);
+          setCustomerProfile(profile);
         }
       } catch (error) {
         console.error("CustomerAuthProvider: Unexpected error during auth initialization:", error);
@@ -121,26 +134,30 @@ export const CustomerAuthProvider = ({ children }: { children: ReactNode }) => {
 
       authChangeTimeoutRef.current = setTimeout(async () => {
         try {
-          // Check if session is expired
-          if (session && session.expires_at && session.expires_at < Date.now() / 1000) {
-            console.log("CustomerAuthProvider: Session expired during auth change, clearing...");
-            // Clear local storage
-            localStorage.removeItem('supabase.auth.token');
-            const supabaseKey = (import.meta.env.VITE_SUPABASE_URL || '').split('.')[0].split('//')[1];
-            if (supabaseKey) {
-              localStorage.removeItem('sb-' + supabaseKey + '-auth-token');
-            }
-            sessionStorage.clear();
-            supabase.auth.signOut({ scope: 'local' });
-            setSession(null);
-            setUser(null);
+          // Set session and user state
+          setSession(session);
+          setUser(session?.user ?? null);
+  
+          // Fetch customer profile if user exists
+          if (session?.user) {
+            const profile = await fetchCustomerProfile(session.user.id);
+            setCustomerProfile(profile);
           } else {
-            setSession(session);
-            setUser(session?.user ?? null);
-
-            // Handle OAuth user profile creation if user just signed in
-            if (session?.user && _event === 'SIGNED_IN') {
-              await handleOAuthUserProfile(session.user);
+            setCustomerProfile(null);
+          }
+  
+          // Handle OAuth user profile creation if user just signed in
+          if (session?.user && _event === 'SIGNED_IN') {
+            await handleOAuthUserProfile(session.user);
+            
+            // Check for post-auth redirect
+            const postAuthRedirect = localStorage.getItem('post_auth_redirect');
+            if (postAuthRedirect) {
+              localStorage.removeItem('post_auth_redirect');
+              // Use setTimeout to ensure the redirect happens after the auth state is fully established
+              setTimeout(() => {
+                window.location.href = postAuthRedirect;
+              }, 100);
             }
           }
         } catch (error) {
@@ -163,36 +180,29 @@ export const CustomerAuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     console.log("CustomerAuthContext: Starting sign out...");
 
-    // Clear local state immediately to prevent UI from getting stuck
-    setUser(null);
-    setSession(null);
-    localStorage.removeItem('supabase.auth.token');
-    const supabaseKey = (import.meta.env.VITE_SUPABASE_URL || '').split('.')[0].split('//')[1];
-    if (supabaseKey) {
-      localStorage.removeItem('sb-' + supabaseKey + '-auth-token');
-    }
-    sessionStorage.clear();
+    try {
+      // Clear local state immediately to prevent UI from getting stuck
+      setUser(null);
+      setSession(null);
+      setCustomerProfile(null);
 
-    // Attempt server-side sign out in background (don't wait for it)
-    supabase.auth.signOut({ scope: 'local' }).then(({ error }: { error: AuthError | null }) => {
+      // Sign out from Supabase (this will clear storage automatically)
+      const { error } = await supabase.auth.signOut();
+      
       if (error) {
-        if (error.message?.includes('Invalid Refresh Token') || error.message?.includes('Refresh Token Not Found')) {
-          console.warn("CustomerAuthContext: Refresh token expired (handled gracefully)");
-        } else {
-          console.error("CustomerAuthContext: Sign out error:", error);
-        }
+        console.error("CustomerAuthContext: Sign out error:", error);
       } else {
         console.log("CustomerAuthContext: Sign out completed successfully");
       }
-    }).catch((error: Error) => {
+    } catch (error) {
       console.error("CustomerAuthContext: Sign out failed:", error);
-    });
+    }
   };
 
-  const value = {
+  const value: CustomerAuthContextType = {
     user,
     session,
-    customerProfile: null,
+    customerProfile,
     isLoading,
     signOut,
   };
@@ -203,5 +213,3 @@ export const CustomerAuthProvider = ({ children }: { children: ReactNode }) => {
     </CustomerAuthContext.Provider>
   );
 };
-
-

@@ -107,31 +107,35 @@ export const useDresses = (filters?: DressFilters) => {
         "postgres_changes",
         { event: "*", schema: "public", table: "dresses" },
         (payload) => {
-          const newDress = payload.new as Dress;
-          const oldDress = payload.old as Dress;
+          try {
+            const newDress = payload.new as Dress;
+            const oldDress = payload.old as Dress;
 
-          switch (payload.eventType) {
-            case "INSERT":
-              if (newDress) {
-                setDresses((prev) =>
-                  prev.some((d) => d.id === newDress.id)
-                    ? prev
-                    : [newDress, ...prev]
-                );
-              }
-              break;
-            case "UPDATE":
-              if (newDress) {
-                setDresses((prev) =>
-                  prev.map((d) => (d.id === newDress.id ? newDress : d))
-                );
-              }
-              break;
-            case "DELETE":
-              if (oldDress) {
-                setDresses((prev) => prev.filter((d) => d.id !== oldDress.id));
-              }
-              break;
+            switch (payload.eventType) {
+              case "INSERT":
+                if (newDress) {
+                  setDresses((prev) =>
+                    prev.some((d) => d.id === newDress.id)
+                      ? prev
+                      : [newDress, ...prev]
+                  );
+                }
+                break;
+              case "UPDATE":
+                if (newDress) {
+                  setDresses((prev) =>
+                    prev.map((d) => (d.id === newDress.id ? newDress : d))
+                  );
+                }
+                break;
+              case "DELETE":
+                if (oldDress) {
+                  setDresses((prev) => prev.filter((d) => d.id !== oldDress.id));
+                }
+                break;
+            }
+          } catch (error) {
+            console.error("Error handling realtime dress update:", error);
           }
         }
       )

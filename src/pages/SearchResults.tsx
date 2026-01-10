@@ -14,7 +14,7 @@ import { searchSchema, type SearchFormData } from "@/lib/validations";
 import { useShops, type ShopFilters } from "@/hooks/useShops";
 
 import { supabase } from "@/integrations/supabaseClient";
-import { useAuthModal } from "@/contexts/AuthModalContext";
+import { useAuthModal } from "@/contexts/useAuthModal";
 import { useNavigate } from "react-router-dom";
 
 // Mock data - same as in Dresses and Shops pages

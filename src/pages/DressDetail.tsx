@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabaseClient";
 import { useCart } from "@/hooks/useCart";
-import { useAuthModal } from "@/contexts/AuthModalContext";
+import { useAuthModal } from "@/contexts/useAuthModal";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -70,7 +70,8 @@ const DressDetail = () => {
     if (!dress) return;
     supabase.auth.getSession().then(({ data }) => {
       if (!data.session) {
-        openModal(() => handleAddToCart());
+        // Open auth modal with redirect back to this dress detail page
+        openModal(() => handleAddToCart(), `/dress/${dress.id}`);
       } else {
         addToCart({
           id: dress.id,

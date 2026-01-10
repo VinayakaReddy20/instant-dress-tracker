@@ -1,26 +1,21 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
-
-interface AuthModalContextType {
-  isOpen: boolean;
-  openModal: (callback: () => void) => void;
-  closeModal: () => void;
-  executeCallback: () => void;
-}
-
-const AuthModalContext = createContext<AuthModalContextType | undefined>(undefined);
+import React, { useState, ReactNode } from "react";
+import { AuthModalContext, AuthModalContextType } from "./AuthModalContextValue";
 
 export const AuthModalProvider = ({ children }: { children: ReactNode }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [callback, setCallback] = useState<(() => void) | null>(null);
+  const [redirectPath, setRedirectPath] = useState<string | null>(null);
 
-  const openModal = (cb: () => void) => {
+  const openModal = (cb: () => void, redirectPath?: string) => {
     setCallback(() => cb);
+    setRedirectPath(redirectPath || null);
     setIsOpen(true);
   };
 
   const closeModal = () => {
     setIsOpen(false);
     setCallback(null);
+    setRedirectPath(null);
   };
 
   const executeCallback = () => {
@@ -31,16 +26,9 @@ export const AuthModalProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthModalContext.Provider value={{ isOpen, openModal, closeModal, executeCallback }}>
+    <AuthModalContext.Provider value={{ isOpen, openModal, closeModal, executeCallback, redirectPath }}>
       {children}
     </AuthModalContext.Provider>
   );
 };
 
-export const useAuthModal = (): AuthModalContextType => {
-  const context = useContext(AuthModalContext);
-  if (!context) {
-    throw new Error("useAuthModal must be used within an AuthModalProvider");
-  }
-  return context;
-};

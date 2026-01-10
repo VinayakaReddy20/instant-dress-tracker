@@ -22,8 +22,9 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 
 import { supabase } from "@/integrations/supabaseClient";
 import { CartProvider } from "@/contexts/CartContext";
-import { AuthModalProvider, useAuthModal } from "@/contexts/AuthModalContext";
-import { CustomerAuthProvider } from "@/contexts/CustomerAuthContext";
+import { AuthModalProvider } from "@/contexts/AuthModalContext";
+import { useAuthModal } from "@/contexts/useAuthModal";
+import { CustomerAuthProvider } from "@/contexts/CustomerAuthProvider";
 import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 
 const queryClient = new QueryClient();

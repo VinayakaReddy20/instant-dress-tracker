@@ -18,6 +18,7 @@ import {
   Package,
   Star,
 } from "lucide-react";
+import LogoutConfirmationModal from "@/components/LogoutConfirmationModal";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/integrations/supabaseClient";
 import DressList from "@/components/DressList";
@@ -66,6 +67,7 @@ export default function Dashboard() {
   const [shop, setShop] = useState<Shop | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ownerId, setOwnerId] = useState<string | null>(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const [dresses, setDresses] = useState<DressFormData[]>([]);
   const [loadingDresses, setLoadingDresses] = useState(false);
@@ -237,7 +239,11 @@ export default function Dashboard() {
   };
 
   // ----- LOGOUT -----
-  const handleLogout = async () => {
+  const handleLogout = () => {
+    setShowLogoutModal(true);
+  };
+
+  const handleConfirmLogout = async () => {
     try {
       await supabase.auth.signOut();
       navigate("/");
@@ -276,13 +282,15 @@ export default function Dashboard() {
       }
 
       // Delete customer record if it exists
-      const { error: customerError } = await supabase
-        .from("customers")
-        .delete()
-        .eq("user_id", ownerId);
-      if (customerError) {
-        console.error("Error deleting customer record:", customerError);
-        // Continue with sign out even if customer deletion fails
+      if (ownerId) {
+        const { error: customerError } = await supabase
+          .from("customers")
+          .delete()
+          .eq("user_id", ownerId);
+        if (customerError) {
+          console.error("Error deleting customer record:", customerError);
+          // Continue with sign out even if customer deletion fails
+        }
       }
 
       // Sign out the user since their account is deleted
@@ -638,6 +646,13 @@ export default function Dashboard() {
           {/* Removed Orders Tab as per user request */}
         </Tabs>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      <LogoutConfirmationModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleConfirmLogout}
+      />
     </div>
   );
 }
