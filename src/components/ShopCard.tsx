@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MapPin, Star, Eye } from "lucide-react";
 import { motion } from "framer-motion";
-import { useAuthModal } from "@/contexts/useAuthModal";
+import { useAuthGuard } from "@/lib/authGuard";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabaseClient";
 import type { Database } from "@/types";
@@ -15,7 +15,7 @@ interface ShopCardProps {
 }
 
 export function ShopCard({ shop, onViewShop }: ShopCardProps) {
-  const { openModal } = useAuthModal();
+  const { protectRoute } = useAuthGuard();
   const navigate = useNavigate();
 
   // Animation variants for the card
@@ -29,19 +29,21 @@ export function ShopCard({ shop, onViewShop }: ShopCardProps) {
   };
 
   const handleViewShop = () => {
-    if (onViewShop) {
-      onViewShop(shop);
-    } else {
-      // Check if user is authenticated before allowing shop access
-      supabase.auth.getSession().then(({ data }) => {
-        if (!data.session) {
-          // User not logged in, open auth modal with callback to navigate to shop
-          openModal(() => navigate(`/shop/${shop.id}`), `/shop/${shop.id}`);
-        } else {
-          // User is logged in, navigate directly to shop
-          navigate(`/shop/${shop.id}`);
-        }
-      });
+    const canProceed = protectRoute(() => {
+      if (onViewShop) {
+        onViewShop(shop);
+      } else {
+        navigate(`/shop/${shop.id}`);
+      }
+    }, `/shop/${shop.id}`);
+
+    if (canProceed) {
+      // User is already authenticated, proceed with action
+      if (onViewShop) {
+        onViewShop(shop);
+      } else {
+        navigate(`/shop/${shop.id}`);
+      }
     }
   };
 

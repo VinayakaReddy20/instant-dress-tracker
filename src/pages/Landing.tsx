@@ -16,9 +16,8 @@ import { useAuthGuard } from "@/lib/authGuard";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { debugLog, logApiError } from "@/lib/errorHandling";
-import { Carousel, CarouselContent, CarouselItem } from "@/components/ui/carousel";
-import { DressCard } from "@/components/DressCard";
-import { ShopCard } from "@/components/ShopCard";
+// Removed Carousel imports - no longer using carousel for featured sections
+// Removed DressCard and ShopCard imports - using direct card rendering instead
 
 import type { Database } from "@/types";
 
@@ -45,8 +44,24 @@ const Landing = () => {
   // New state for newsletter email input and loading
   const [email, setEmail] = useState("");
   const [isSubscribing, setIsSubscribing] = useState(false);
+  
+  // State for button loading states
+  const [isAddingToCart, setIsAddingToCart] = useState<string | null>(null);
+  const [isNavigatingToShop, setIsNavigatingToShop] = useState<string | null>(null);
 
   const { cart, addToCart } = useCart();
+  const { protectRoute, isAuthenticated, isLoading: authLoading } = useAuthGuard();
+
+  // Debug logging for authentication state and cart
+  useEffect(() => {
+    console.log('Landing page auth state:', { isAuthenticated, authLoading });
+    console.log('Landing page cart state:', cart);
+  }, [isAuthenticated, authLoading, cart]);
+
+  // Debug logging for cart changes
+  useEffect(() => {
+    console.log('Cart updated:', cart);
+  }, [cart]);
 
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -357,12 +372,55 @@ const Landing = () => {
                              (selectedColors.length > 0 ? 1 : 0) +
                              (priceRange[0] > 0 || priceRange[1] < 10000 ? 1 : 0);
 
-  // Customer authentication check for addToCart
-  const { protectRoute } = useAuthGuard();
+  // Customer authentication check for addToCart - already defined above
 
-  const handleAddToCart = (dress: Dress) => {
-    protectRoute(() => {
-      addToCart({
+  const handleAddToCart = async (dress: Dress) => {
+    console.log('handleAddToCart called for dress:', dress.name);
+    
+    // Set loading state
+    setIsAddingToCart(dress.id);
+    
+    try {
+      // Check if user is authenticated
+      if (!isAuthenticated && !authLoading) {
+        console.log('User not authenticated, showing auth modal');
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to add items to your cart.",
+          variant: "destructive"
+        });
+        // Open auth modal with callback to add to cart after login
+        protectRoute(() => {
+          addToCart({
+            id: dress.id,
+            name: dress.name,
+            price: dress.price || 0,
+            size: dress.size,
+            color: dress.color || undefined,
+            category: dress.category || undefined,
+            image_url: dress.image_url || undefined,
+            shop_id: dress.shop_id,
+            shop: dress.shops ? {
+              name: dress.shops.name,
+              location: dress.shops.location || ""
+            } : undefined,
+          });
+          toast({
+            title: "Added to cart!",
+            description: `${dress.name} has been added to your cart.`,
+            duration: 3000
+          });
+        }, `/dress/${dress.id}`);
+        return;
+      }
+
+      if (authLoading) {
+        console.log('Still loading authentication state');
+        return;
+      }
+
+      console.log('Adding to cart for authenticated user');
+      await addToCart({
         id: dress.id,
         name: dress.name,
         price: dress.price || 0,
@@ -379,8 +437,20 @@ const Landing = () => {
       toast({
         title: "Added to cart!",
         description: `${dress.name} has been added to your cart.`,
+        duration: 3000
       });
-    }, `/dress/${dress.id}`);
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add item to cart. Please try again.",
+        variant: "destructive",
+        duration: 4000
+      });
+    } finally {
+      // Clear loading state
+      setIsAddingToCart(null);
+    }
   };
 
   // Animation variants
@@ -536,7 +606,11 @@ const Landing = () => {
                 {filteredShops.map((shop) => (
                   <Card key={shop.id} className="min-w-[320px] flex-shrink-0 snap-start group hover:shadow-xl transition-all duration-300 border-0 shadow-md bg-white">
                     <div className="block cursor-pointer" onClick={() => {
-                      protectRoute(() => navigate(`/shop/${shop.id}`), `/shop/${shop.id}`);
+                      console.log('Shop card clicked:', shop.name);
+                      protectRoute(() => {
+                        console.log('Navigating to shop:', shop.id);
+                        navigate(`/shop/${shop.id}`);
+                      }, `/shop/${shop.id}`);
                     }}>
                       <div className="relative overflow-hidden rounded-t-xl">
                         <img
@@ -568,8 +642,29 @@ const Landing = () => {
                             Open
                           </Badge>
                         </div>
-                        <Button className="w-full bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-lg transition-all duration-200">
-                          Visit Shop
+                        <Button
+                          className="w-full bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-lg transition-all duration-200"
+                          onClick={() => {
+                            console.log('Visit Shop button clicked for:', shop.name);
+                            setIsNavigatingToShop(shop.id);
+                            protectRoute(() => {
+                              console.log('Navigating to shop from button:', shop.id);
+                              navigate(`/shop/${shop.id}`);
+                            }, `/shop/${shop.id}`);
+                            // Clear loading state after navigation
+                            setTimeout(() => setIsNavigatingToShop(null), 1000);
+                          }}
+                          disabled={isNavigatingToShop === shop.id}
+                          aria-label={`Visit ${shop.name} shop`}
+                        >
+                          {isNavigatingToShop === shop.id ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                              Navigating...
+                            </>
+                          ) : (
+                            'Visit Shop'
+                          )}
                         </Button>
                       </CardContent>
                     </div>
@@ -682,9 +777,20 @@ const Landing = () => {
                         <Button
                           className="w-full bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-lg transition-all duration-200"
                           onClick={() => handleAddToCart(dress)}
+                          disabled={isAddingToCart === dress.id}
+                          aria-label={`Add ${dress.name} to cart`}
                         >
-                          <ShoppingCart className="w-4 h-4 mr-2" />
-                          Add to Cart
+                          {isAddingToCart === dress.id ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                              Adding...
+                            </>
+                          ) : (
+                            <>
+                              <ShoppingCart className="w-4 h-4 mr-2" />
+                              Add to Cart
+                            </>
+                          )}
                         </Button>
                       </CardFooter>
                     </Card>
@@ -770,9 +876,20 @@ const Landing = () => {
                             <Button
                               className="flex-1 bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-lg transition-all duration-200"
                               onClick={() => handleAddToCart(dress)}
+                              disabled={isAddingToCart === dress.id}
+                              aria-label={`Add ${dress.name} to cart`}
                             >
-                              <ShoppingCart className="w-4 h-4 mr-2" />
-                              Add to Cart
+                              {isAddingToCart === dress.id ? (
+                                <>
+                                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                  Adding...
+                                </>
+                              ) : (
+                                <>
+                                  <ShoppingCart className="w-4 h-4 mr-2" />
+                                  Add to Cart
+                                </>
+                              )}
                             </Button>
                             <Button
                               variant="outline"
@@ -936,36 +1053,101 @@ const Landing = () => {
           <h2 className="text-3xl font-playfair font-bold text-center mb-12">Recently Added Dresses</h2>
 
           {dresses.length > 0 ? (
-            <Carousel
-              showArrows={true}
-              showDots={true}
-              autoPlay={true}
-              autoPlayInterval={5000}
-              responsive={{
-                desktop: 4,
-                tablet: 3,
-                mobile: 1,
-              }}
-              className="w-full"
-            >
-              <CarouselContent>
-                {dresses
-                  // Sort by created_at (latest first)
-                  .sort((a, b) => {
-                    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-                    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-                    return dateB - dateA;
-                  })
-                  .map((dress) => (
-                    <CarouselItem key={dress.id}>
-                      <DressCard
-                        dress={dress}
-                        onQuickView={openQuickView}
-                      />
-                    </CarouselItem>
-                  ))}
-              </CarouselContent>
-            </Carousel>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {dresses
+                // Sort by created_at (latest first)
+                .sort((a, b) => {
+                  const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                  const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                  return dateB - dateA;
+                })
+                .map((dress) => (
+                  <div key={dress.id} className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">
+                    <div className="relative overflow-hidden">
+                      <div className="aspect-[3/4] overflow-hidden">
+                        <img
+                          src={dress.image_url || "https://via.placeholder.com/300x400?text=Dress+Image"}
+                          alt={dress.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      </div>
+
+                      {/* Badges */}
+                      <div className="absolute top-3 left-3 flex flex-col gap-2">
+                        {isNewDress(dress) && (
+                          <Badge className="bg-green-500 hover:bg-green-600 text-white text-xs font-medium px-2 py-1">
+                            New
+                          </Badge>
+                        )}
+                        {dress.category && (
+                          <Badge className="bg-white/90 text-gray-800 backdrop-blur-sm text-xs font-medium px-2 py-1">
+                            {dress.category}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Quick Actions Overlay */}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="bg-white hover:bg-gray-50 text-gray-900 font-medium shadow-lg"
+                          onClick={() => {
+                            protectRoute(() => openQuickView(dress), `/dress/${dress.id}`);
+                          }}
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          Quick View
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="p-5">
+                      {/* Rating */}
+                      <div className="flex items-center gap-1 mb-2">
+                        <div className="flex">
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                          ))}
+                        </div>
+                        <span className="text-xs text-gray-500 ml-1">4.5 (89)</span>
+                      </div>
+
+                      {/* Product Name */}
+                      <h3 className="font-semibold text-gray-900 line-clamp-2 mb-2 group-hover:text-primary transition-colors text-sm leading-tight">
+                        {dress.name}
+                      </h3>
+
+                      {/* Shop Info */}
+                      <p className="text-xs text-gray-600 flex items-center mb-3">
+                        <MapPin className="w-3 h-3 mr-1 text-gray-400" />
+                        {dress.shops?.name}
+                      </p>
+
+                      {/* Price and Size */}
+                      <div className="flex justify-between items-center mb-4">
+                        <div className="flex flex-col">
+                          <span className="text-lg font-bold text-primary">₹{(dress.price || 0).toLocaleString("en-IN")}</span>
+                          {dress.color && (
+                            <span className="text-xs text-gray-500">Color: {dress.color}</span>
+                          )}
+                        </div>
+                        <Badge variant="outline" className="text-xs border-gray-300 font-medium">
+                          {dress.size}
+                        </Badge>
+                      </div>
+
+                      <Button
+                        className="w-full bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-lg transition-all duration-200"
+                        onClick={() => handleAddToCart(dress)}
+                      >
+                        <ShoppingCart className="w-4 h-4 mr-2" />
+                        Add to Cart
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+            </div>
           ) : (
             <p className="text-center text-gray-500">No dresses available</p>
           )}
@@ -977,31 +1159,63 @@ const Landing = () => {
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-playfair font-bold text-center mb-12">Featured Shops</h2>
           {shops.length > 0 ? (
-            <Carousel
-              showArrows={true}
-              showDots={true}
-              autoPlay={true}
-              autoPlayInterval={4000}
-              responsive={{
-                desktop: 3,
-                tablet: 2,
-                mobile: 1,
-              }}
-              className="w-full"
-            >
-              <CarouselContent>
-                {shops.map((shop) => (
-                  <CarouselItem key={shop.id}>
-                    <ShopCard
-                      shop={shop}
-                      onViewShop={(shop) => {
-                        protectRoute(() => navigate(`/shop/${shop.id}`), `/shop/${shop.id}`);
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {shops.map((shop) => (
+                <div key={shop.id} className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">
+                  <div className="relative overflow-hidden">
+                    <div className="aspect-[4/3] overflow-hidden">
+                      <img
+                        src={shop.image_url || "https://via.placeholder.com/400x300?text=Shop+Image"}
+                        alt={shop.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                    
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  </div>
+
+                  <div className="p-6">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-primary transition-colors">
+                      {shop.name}
+                    </h3>
+                    
+                    <p className="text-sm text-gray-600 flex items-center mb-3">
+                      <MapPin className="w-4 h-4 mr-2 text-gray-400" />
+                      {shop.location}
+                    </p>
+                    
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-1">
+                        <div className="flex">
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                          ))}
+                        </div>
+                        <span className="text-sm font-medium text-gray-700 ml-1">{shop.rating || 4.8}</span>
+                        <span className="text-sm text-gray-500">({shop.review_count || 124})</span>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        Open
+                      </Badge>
+                    </div>
+                    
+                    <Button
+                      className="w-full bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-lg transition-all duration-200"
+                      onClick={() => {
+                        console.log('Shop card clicked:', shop.name);
+                        protectRoute(() => {
+                          console.log('Navigating to shop:', shop.id);
+                          navigate(`/shop/${shop.id}`);
+                        }, `/shop/${shop.id}`);
                       }}
-                    />
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-            </Carousel>
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      View Shop
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <p className="text-center text-gray-500">No shops available</p>
           )}
@@ -1025,6 +1239,8 @@ const Landing = () => {
             <Button
               className="bg-white text-primary hover:bg-gray-100"
               onClick={async () => {
+                console.log('Newsletter subscription attempt with email:', email);
+                
                 if (!email) {
                   toast({
                     variant: "destructive",
@@ -1033,6 +1249,7 @@ const Landing = () => {
                   });
                   return;
                 }
+                
                 // Basic email format validation
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                 if (!emailRegex.test(email)) {
@@ -1043,17 +1260,22 @@ const Landing = () => {
                   });
                   return;
                 }
+                
                 setIsSubscribing(true);
                 try {
+                  console.log('Attempting newsletter subscription...');
+                  
                   // Simulate newsletter subscription (replace with actual API call when backend is ready)
                   await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API delay
-
+  
+                  console.log('Newsletter subscription successful');
                   toast({
                     title: "Subscribed!",
                     description: "Thank you for subscribing! We'll keep you updated with the latest fashion trends.",
                   });
                   setEmail("");
                 } catch (err) {
+                  console.error('Newsletter subscription error:', err);
                   toast({
                     variant: "destructive",
                     title: "Subscription failed",
@@ -1115,7 +1337,7 @@ const Landing = () => {
                   )}
                 </div>
                 <div className="flex gap-3">
-                  <Button className="flex-1 bg-gradient-to-r from-primary to-primary/80 text-white" onClick={() => handleAddToCart(selectedDress)}>
+                  <Button className="flex-1 bg-gradient-to-r from-primary to-primary/80 text-white" onClick={() => handleAddToCart(selectedDress)} disabled={isAddingToCart === selectedDress?.id}>
                     Add to Cart
                   </Button>
                 </div>

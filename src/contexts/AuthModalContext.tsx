@@ -1,47 +1,61 @@
-import React, { useState, ReactNode } from "react";
-import { AuthModalContext, AuthModalContextType } from "./AuthModalContextValue";
+import React, { createContext, useState, useCallback } from "react";
 
-export const AuthModalProvider = ({ children }: { children: ReactNode }) => {
+export interface AuthModalContextType {
+  isOpen: boolean;
+  openModal: (callback: () => void, redirectPath?: string) => void;
+  closeModal: () => void;
+  executeCallback: () => void;
+  executeCallbackAndRedirect: () => void;
+  redirectPath: string | null;
+}
+
+export const AuthModalContext = createContext<AuthModalContextType | undefined>(undefined);
+
+export const AuthModalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [callback, setCallback] = useState<(() => void) | null>(null);
   const [redirectPath, setRedirectPath] = useState<string | null>(null);
 
-  const openModal = (cb: () => void, redirectPath?: string) => {
+  const openModal = useCallback((cb: () => void, path?: string) => {
     setCallback(() => cb);
-    setRedirectPath(redirectPath || null);
+    setRedirectPath(path || null);
     setIsOpen(true);
-  };
+  }, []);
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setIsOpen(false);
     setCallback(null);
     setRedirectPath(null);
-  };
+  }, []);
 
-  const executeCallback = () => {
+  const executeCallback = useCallback(() => {
     if (callback) {
       callback();
       closeModal();
     }
-  };
+  }, [callback, closeModal]);
 
-  const executeCallbackAndRedirect = async () => {
+  const executeCallbackAndRedirect = useCallback(() => {
     if (callback) {
       callback();
+      if (redirectPath) {
+        window.location.href = redirectPath;
+      }
+      closeModal();
     }
-    if (redirectPath) {
-      // Store redirect path using our new utility
-      const { RedirectStateStorage } = await import('@/lib/authGuard');
-      RedirectStateStorage.setRedirectPath({
-        path: redirectPath,
-        search: window.location.search || undefined,
-      });
-    }
-    closeModal();
+  }, [callback, redirectPath, closeModal]);
+
+  const value: AuthModalContextType = {
+    isOpen,
+    openModal,
+    closeModal,
+    executeCallback,
+    executeCallbackAndRedirect,
+    redirectPath
   };
 
   return (
-    <AuthModalContext.Provider value={{ isOpen, openModal, closeModal, executeCallback, executeCallbackAndRedirect, redirectPath }}>
+    <AuthModalContext.Provider value={value}>
       {children}
     </AuthModalContext.Provider>
   );

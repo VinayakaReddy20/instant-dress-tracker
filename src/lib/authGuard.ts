@@ -77,7 +77,7 @@ export const useAuthGuard = () => {
    * If not authenticated, opens login modal with redirect state
    */
   const protectRoute = (callback?: () => void, customRedirectPath?: string) => {
-    if (isLoading) return;
+    if (isLoading) return false;
 
     if (!user) {
       // Store current location or custom redirect path

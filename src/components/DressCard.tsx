@@ -98,8 +98,8 @@ export function DressCard({ dress, onQuickView }: DressCardProps) {
       }
     }, `/dress/${dress.id}`);
 
+    // If user is already authenticated, proceed with action
     if (canProceed) {
-      // User is already authenticated, proceed with action
       try {
         // Validate stock before adding to cart
         const validation = await validateStock(dress.id, 1);
